@@ -10,6 +10,7 @@ import "./libraries/utils/ReentrancyGuard.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Factory.sol";
 import "./interfaces/IX2Router.sol";
+import "./interfaces/IX2FeeReceiver.sol";
 
 contract X2Market is IX2Market, ReentrancyGuard {
     using SafeMath for uint256;
@@ -85,9 +86,12 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function distributeFees() public nonReentrant {
+        address feeReceiver = IX2Factory(factory).feeReceiver();
+        require(feeReceiver != address(0), "X2Market: empty feeReceiver");
+
         feeReserve = 0;
-        IERC20(collateralToken).safeTransfer(factory, feeReserve);
-        IX2Factory(factory).distributeFees(collateralToken);
+        IERC20(collateralToken).safeTransfer(feeReceiver, feeReserve);
+        IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, feeReserve);
     }
 
     function _updateReserve() private {

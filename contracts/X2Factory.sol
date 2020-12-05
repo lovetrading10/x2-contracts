@@ -6,7 +6,6 @@ import "./libraries/math/SafeMath.sol";
 import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2Factory.sol";
-import "./interfaces/IX2FeeReceiver.sol";
 
 contract X2Factory is IX2Factory {
     using SafeMath for uint256;
@@ -16,7 +15,7 @@ contract X2Factory is IX2Factory {
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
 
     address public gov;
-    address public feeReceiver;
+    address public override feeReceiver;
     address public override feeToken;
 
     modifier onlyGov() {
@@ -42,11 +41,5 @@ contract X2Factory is IX2Factory {
             return 0;
         }
         return _amount.mul(FEE_BASIS_POINTS).div(BASIS_POINTS_DIVISOR);
-    }
-
-    function distributeFees(address token) public override {
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        IERC20(token).safeTransfer(feeReceiver, balance);
-        IX2FeeReceiver(feeReceiver).notifyFees(token, balance);
     }
 }
