@@ -18,15 +18,17 @@ contract X2Factory is IX2Factory {
     address public gov;
     address public feeReceiver;
     address public override feeToken;
+    address public override weth;
 
     modifier onlyGov() {
         require(msg.sender == gov, "X2Market: forbidden");
         _;
     }
 
-    constructor(address _feeToken) public {
-        gov = msg.sender;
+    constructor(address _weth, address _feeToken) public {
+        weth = _weth;
         feeToken = _feeToken;
+        gov = msg.sender;
     }
 
     function setGov(address _gov) public onlyGov {

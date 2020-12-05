@@ -7,5 +7,5 @@ interface IX2Market {
     function collateralToken() external view returns (address);
     function getNextUnlockTimestamp() external view returns (uint256);
     function deposit(uint256 amount) external returns (bool);
-    function withdraw(address receiver, uint256 amount) external returns (bool);
+    function withdraw(address receiver, uint256 amount) external returns (uint256);
 }

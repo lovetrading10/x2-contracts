@@ -65,14 +65,14 @@ contract X2Market is IX2Market, ReentrancyGuard {
         return true;
     }
 
-    function withdraw(address _receiver, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (bool) {
+    function withdraw(address _receiver, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
         uint256 fee = _collectFees(_amount);
 
         uint256 withdrawAmount = _amount.sub(fee);
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 
         _updateReserve();
-        return true;
+        return withdrawAmount;
     }
 
     function getNextUnlockTimestamp() public override view returns (uint256) {

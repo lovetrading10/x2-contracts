@@ -7,8 +7,10 @@ import "./libraries/token/SafeERC20.sol";
 import "./libraries/math/SafeMath.sol";
 import "./libraries/utils/ReentrancyGuard.sol";
 
+import "./interfaces/IX2Factory.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
+import "./interfaces/IWETH.sol";
 
 contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     using SafeMath for uint256;
@@ -20,27 +22,43 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     uint256 public _totalSupply;
 
     address public market;
+    address public factory;
 
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
 
     mapping (address => uint256) public unlockTimestamps;
 
-    constructor(string memory _name, string memory _symbol, address _market) public {
+    constructor(string memory _name, string memory _symbol, address _market, address _factory) public {
         name = _name;
         symbol = _symbol;
         market = _market;
+        factory = _factory;
     }
 
-    function mint(address _receiver, uint256 _amount) public override nonReentrant returns (bool) {
+    receive() external payable {
+        require(msg.sender == IX2Factory(factory).weth(), "X2Token: unsupported sender");
+    }
+
+    function deposit(address _receiver, uint256 _amount) public override nonReentrant returns (bool) {
         _mint(_receiver, _amount);
         IX2Market(market).deposit(_amount);
         return true;
     }
 
-    function burn(address _receiver, uint256 _amount) public nonReentrant returns (bool) {
+    function withdraw(address _receiver, uint256 _amount) public nonReentrant returns (bool) {
         _burn(msg.sender, _amount);
         IX2Market(market).withdraw(_receiver, _amount);
+        return true;
+    }
+
+    function withdrawETH(address _receiver, uint256 _amount) public nonReentrant returns (bool) {
+        _burn(msg.sender, _amount);
+        uint256 withdrawAmount = IX2Market(market).withdraw(address(this), _amount);
+        IWETH(IX2Factory(factory).weth()).withdraw(withdrawAmount);
+
+        (bool success,) = _receiver.call{value: withdrawAmount}("");
+        require(success, "X2Token: eth transfer failed");
         return true;
     }
 
