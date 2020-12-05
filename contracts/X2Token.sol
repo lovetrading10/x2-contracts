@@ -10,7 +10,6 @@ import "./libraries/utils/ReentrancyGuard.sol";
 import "./interfaces/IX2Factory.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
-import "./interfaces/IWETH.sol";
 
 contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     using SafeMath for uint256;
@@ -22,44 +21,33 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     uint256 public _totalSupply;
 
     address public market;
-    address public factory;
+    address public router;
 
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
 
     mapping (address => uint256) public unlockTimestamps;
 
-    constructor(string memory _name, string memory _symbol, address _market, address _factory) public {
+    modifier onlyRouter() {
+        require(msg.sender == router, "X2Token: forbidden");
+        _;
+    }
+
+    constructor(string memory _name, string memory _symbol, address _market, address _router) public {
         name = _name;
         symbol = _symbol;
         market = _market;
-        factory = _factory;
+        router = _router;
     }
 
-    receive() external payable {
-        require(msg.sender == IX2Factory(factory).weth(), "X2Token: unsupported sender");
-    }
-
-    function deposit(address _receiver, uint256 _amount) public override nonReentrant returns (bool) {
+    function deposit(address _receiver, uint256 _amount) public override onlyRouter nonReentrant returns (uint256) {
         _mint(_receiver, _amount);
-        IX2Market(market).deposit(_amount);
-        return true;
+        return IX2Market(market).deposit(_amount);
     }
 
-    function withdraw(address _receiver, uint256 _amount) public nonReentrant returns (bool) {
-        _burn(msg.sender, _amount);
-        IX2Market(market).withdraw(_receiver, _amount);
-        return true;
-    }
-
-    function withdrawETH(address _receiver, uint256 _amount) public nonReentrant returns (bool) {
-        _burn(msg.sender, _amount);
-        uint256 withdrawAmount = IX2Market(market).withdraw(address(this), _amount);
-        IWETH(IX2Factory(factory).weth()).withdraw(withdrawAmount);
-
-        (bool success,) = _receiver.call{value: withdrawAmount}("");
-        require(success, "X2Token: eth transfer failed");
-        return true;
+    function withdraw(address _account, address _receiver, uint256 _amount) public override onlyRouter nonReentrant returns (uint256) {
+        _burn(_account, _amount);
+        return IX2Market(market).withdraw(_receiver, _amount);
     }
 
     function totalSupply() public view override returns (uint256) {
@@ -112,7 +100,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
     function _mint(address _account, uint256 _amount) private {
         require(_account != address(0), "X2Token: mint to the zero address");
-        // lock the account for a repricing interval
         unlockTimestamps[_account] = IX2Market(market).getNextUnlockTimestamp();
 
         balances[_account] = balances[_account].add(_amount);
@@ -121,9 +108,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function _burn(address _account, uint256 _amount) private {
-        // accounts can only burn after the unlocked time has passed
-        require(unlocked(_account), "X2Token: account not yet unlocked");
         require(_account != address(0), "X2Token: burn from the zero address");
+        require(unlocked(_account), "X2Token: account not yet unlocked");
 
         balances[_account] = balances[_account].sub(_amount, "X2Token: burn amount exceeds balance");
         _totalSupply = _totalSupply.sub(_amount);

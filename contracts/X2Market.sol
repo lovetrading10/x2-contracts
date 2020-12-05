@@ -9,6 +9,7 @@ import "./libraries/utils/ReentrancyGuard.sol";
 
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Factory.sol";
+import "./interfaces/IX2Router.sol";
 
 contract X2Market is IX2Market, ReentrancyGuard {
     using SafeMath for uint256;
@@ -20,6 +21,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public constant INITIAL_REBASE_DIVISOR = 10**8;
 
     address public factory;
+    address public router;
 
     address public override collateralToken;
     address public bullToken;
@@ -39,12 +41,14 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
     constructor(
         address _factory,
+        address _router,
         address _collateralToken,
         address _bullToken,
         address _bearToken,
         uint256 _interval
     ) public {
         factory = _factory;
+        router = _router;
         collateralToken = _collateralToken;
         bullToken = _bullToken;
         bearToken = _bearToken;
@@ -54,7 +58,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         divisors[bearToken] = INITIAL_REBASE_DIVISOR;
     }
 
-    function deposit(uint256 _amount) public override onlyBullBearTokens nonReentrant returns (bool) {
+    function deposit(uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
         _collectFees(_amount);
 
         uint256 balance = IERC20(collateralToken).balanceOf(address(this));
@@ -62,7 +66,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         require(amount >= _amount, "X2Market: insufficient input amount");
 
         _updateReserve();
-        return true;
+        return _amount;
     }
 
     function withdraw(address _receiver, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
@@ -91,16 +95,17 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function _collectFees(uint256 _amount) private returns (uint256) {
-        address feeToken = IX2Factory(factory).feeToken();
-        uint256 feeTokenBalance = IERC20(feeToken).balanceOf(address(this));
-        uint256 subsidy = feeTokenBalance.sub(feeTokenReserve);
-
         uint256 fee = IX2Factory(factory).getFee(_amount);
-        fee = subsidy < fee ? fee.sub(subsidy) : 0;
 
-        feeReserve = feeReserve.add(fee.sub(subsidy));
-        feeTokenReserve = feeTokenBalance;
+        if (collateralToken == IX2Router(router).weth()) {
+            address feeToken = IX2Factory(factory).feeToken();
+            uint256 feeTokenBalance = IERC20(feeToken).balanceOf(address(this));
+            uint256 subsidy = feeTokenBalance.sub(feeTokenReserve);
+            fee = subsidy < fee ? fee.sub(subsidy) : 0;
+            feeTokenReserve = feeTokenBalance;
+        }
 
+        feeReserve = feeReserve.add(fee);
         return fee;
     }
 }
