@@ -18,9 +18,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    uint256 public constant DELAY_BASIS_POINTS = 15000;
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
-
     uint256 public constant INITIAL_REBASE_DIVISOR = 10**8;
 
     address public factory;
@@ -31,7 +29,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     address public bearToken;
     address public priceFeed;
     uint256 public interval;
-    uint256 public profitCapBasisPoints;
+    uint256 public unlockDelay;
+    uint256 public maxProfitBasisPoints;
 
     uint256 public reserve;
     uint256 public feeReserve;
@@ -57,7 +56,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address _bearToken,
         address _priceFeed,
         uint256 _interval,
-        uint256 _profitCapBasisPoints
+        uint256 _unlockDelay,
+        uint256 _maxProfitBasisPoints
     ) public {
         factory = _factory;
         router = _router;
@@ -66,7 +66,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         bearToken = _bearToken;
         priceFeed = _priceFeed;
         interval = _interval;
-        profitCapBasisPoints = _profitCapBasisPoints;
+        unlockDelay = _unlockDelay;
+        maxProfitBasisPoints = _maxProfitBasisPoints;
 
         cachedDivisors[bullToken] = INITIAL_REBASE_DIVISOR;
         cachedDivisors[bearToken] = INITIAL_REBASE_DIVISOR;
@@ -97,7 +98,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function getNextUnlockTimestamp() public override view returns (uint256) {
-        uint256 unlockDelay = interval.mul(DELAY_BASIS_POINTS).div(BASIS_POINTS_DIVISOR);
         return block.timestamp.add(unlockDelay);
     }
 
@@ -114,6 +114,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         if (block.timestamp < nextRebaseTime) { return false; }
         _setNextRebaseTime();
 
+        cachedDivisors[bullToken] = getDivisor(bullToken);
+        cachedDivisors[bearToken] = getDivisor(bearToken);
     }
 
     function latestPrice() public view returns (uint256) {
@@ -133,7 +135,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         }
 
         uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
-        uint256 maxProfit = refSupply.mul(profitCapBasisPoints).div(BASIS_POINTS_DIVISOR);
+        uint256 maxProfit = refSupply.mul(maxProfitBasisPoints).div(BASIS_POINTS_DIVISOR);
         uint256 movement = nextPrice > lastPrice ? nextPrice.sub(lastPrice) : lastPrice.sub(nextPrice);
         uint256 profit = refSupply.mul(movement).div(lastPrice);
 
