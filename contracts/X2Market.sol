@@ -40,8 +40,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public nextRebaseTime;
 
     mapping (address => uint256) public cachedDivisors;
-    mapping (address => uint256) public pendingDeposits;
-    mapping (address => uint256) public pendingWithdrawals;
 
     modifier onlyBullBearTokens() {
         require(msg.sender == bullToken || msg.sender == bearToken, "X2Market: forbidden");
@@ -97,7 +95,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         return withdrawAmount;
     }
 
-    function getNextUnlockTimestamp() public override view returns (uint256) {
+    function getNextUnlockTime() public override view returns (uint256) {
         return block.timestamp.add(unlockDelay);
     }
 
