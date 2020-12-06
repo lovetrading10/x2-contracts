@@ -18,7 +18,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     string public name;
     string public symbol;
     uint8 public decimals;
-    uint256 public _totalSupply;
+    uint256 public override _totalSupply;
 
     address public market;
     address public router;
@@ -80,7 +80,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function divisor() public view returns (uint256) {
-        return IX2Market(market).divisors(address(this));
+        return IX2Market(market).getDivisor(address(this));
     }
 
     function unlocked(address _account) public view returns (bool) {

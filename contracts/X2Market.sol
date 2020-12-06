@@ -11,6 +11,8 @@ import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Factory.sol";
 import "./interfaces/IX2Router.sol";
 import "./interfaces/IX2FeeReceiver.sol";
+import "./interfaces/IX2PriceFeed.sol";
+import "./interfaces/IX2Token.sol";
 
 contract X2Market is IX2Market, ReentrancyGuard {
     using SafeMath for uint256;
@@ -27,13 +29,20 @@ contract X2Market is IX2Market, ReentrancyGuard {
     address public override collateralToken;
     address public bullToken;
     address public bearToken;
+    address public priceFeed;
     uint256 public interval;
+    uint256 public profitCapBasisPoints;
 
     uint256 public reserve;
     uint256 public feeReserve;
     uint256 public feeTokenReserve;
 
-    mapping (address => uint256) public override divisors;
+    uint256 public lastPrice;
+    uint256 public nextRebaseTime;
+
+    mapping (address => uint256) public cachedDivisors;
+    mapping (address => uint256) public pendingDeposits;
+    mapping (address => uint256) public pendingWithdrawals;
 
     modifier onlyBullBearTokens() {
         require(msg.sender == bullToken || msg.sender == bearToken, "X2Market: forbidden");
@@ -46,17 +55,24 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address _collateralToken,
         address _bullToken,
         address _bearToken,
-        uint256 _interval
+        address _priceFeed,
+        uint256 _interval,
+        uint256 _profitCapBasisPoints
     ) public {
         factory = _factory;
         router = _router;
         collateralToken = _collateralToken;
         bullToken = _bullToken;
         bearToken = _bearToken;
+        priceFeed = _priceFeed;
         interval = _interval;
+        profitCapBasisPoints = _profitCapBasisPoints;
 
-        divisors[bullToken] = INITIAL_REBASE_DIVISOR;
-        divisors[bearToken] = INITIAL_REBASE_DIVISOR;
+        cachedDivisors[bullToken] = INITIAL_REBASE_DIVISOR;
+        cachedDivisors[bearToken] = INITIAL_REBASE_DIVISOR;
+
+        lastPrice = latestPrice();
+        _setNextRebaseTime();
     }
 
     function deposit(uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
@@ -92,6 +108,53 @@ contract X2Market is IX2Market, ReentrancyGuard {
         feeReserve = 0;
         IERC20(collateralToken).safeTransfer(feeReceiver, feeReserve);
         IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, feeReserve);
+    }
+
+    function rebase() public override returns (bool) {
+        if (block.timestamp < nextRebaseTime) { return false; }
+        _setNextRebaseTime();
+
+    }
+
+    function latestPrice() public view returns (uint256) {
+        return IX2PriceFeed(priceFeed).latestAnswer();
+    }
+
+    function getDivisor(address _token) public override view returns (uint256) {
+        require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
+
+        uint256 totalBulls = IERC20(bullToken).totalSupply();
+        uint256 totalBears = IERC20(bearToken).totalSupply();
+
+        uint256 nextPrice = latestPrice();
+
+        if (nextPrice == lastPrice) {
+            return cachedDivisors[_token];
+        }
+
+        uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
+        uint256 maxProfit = refSupply.mul(profitCapBasisPoints).div(BASIS_POINTS_DIVISOR);
+        uint256 movement = nextPrice > lastPrice ? nextPrice.sub(lastPrice) : lastPrice.sub(nextPrice);
+        uint256 profit = refSupply.mul(movement).div(lastPrice);
+
+        if (profit > maxProfit) { profit = maxProfit; }
+
+        if (_token == bullToken) {
+            uint256 nextSupply = nextPrice > lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
+            return _getNextDivisor(_token, nextSupply);
+        }
+
+        uint256 nextSupply = nextPrice > lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
+        return _getNextDivisor(_token, nextSupply);
+    }
+
+    function _getNextDivisor(address _token, uint256 _nextSupply) private view returns (uint256) {
+        return IX2Token(_token)._totalSupply().div(_nextSupply);
+    }
+
+    function _setNextRebaseTime() private {
+        uint256 roundedTime = block.timestamp.div(interval).mul(interval);
+        nextRebaseTime = roundedTime.add(interval);
     }
 
     function _updateReserve() private {
