@@ -33,6 +33,11 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _;
     }
 
+    modifier onlyMarket() {
+        require(msg.sender == market, "X2Token: forbidden");
+        _;
+    }
+
     constructor(string memory _name, string memory _symbol, address _market, address _router) public {
         name = _name;
         symbol = _symbol;
@@ -41,21 +46,27 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function deposit(address _account, uint256 _amount) public override onlyRouter nonReentrant returns (uint256) {
-        _mint(_account, _amount);
-        return IX2Market(market).deposit(_amount);
+        return IX2Market(market).deposit(_account, _amount);
     }
 
     function withdraw(address _account, address _receiver, uint256 _amount) public override onlyRouter nonReentrant returns (uint256) {
+        return IX2Market(market).withdraw(_account, _receiver, _amount);
+    }
+
+    function mint(address _account, uint256 _amount) public override onlyMarket {
+        _mint(_account, _amount);
+    }
+
+    function burn(address _account, uint256 _amount) public override onlyMarket {
         _burn(_account, _amount);
-        return IX2Market(market).withdraw(_receiver, _amount);
     }
 
     function totalSupply() public view override returns (uint256) {
-        return _totalSupply.div(divisor());
+        return _totalSupply.div(getDivisor());
     }
 
     function balanceOf(address _account) public view override returns (uint256) {
-        return balances[_account].div(divisor());
+        return balances[_account].div(getDivisor());
     }
 
     function transfer(address _recipient, uint256 _amount) public override returns (bool) {
@@ -79,7 +90,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return true;
     }
 
-    function divisor() public view returns (uint256) {
+    function getDivisor() public view returns (uint256) {
         return IX2Market(market).getDivisor(address(this));
     }
 
@@ -92,8 +103,9 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         require(_sender != address(0), "X2Token: transfer from the zero address");
         require(_recipient != address(0), "X2Token: transfer to the zero address");
 
-        _decreaseBalance(_sender, _amount);
-        _increaseBalance(_recipient, _amount);
+        uint256 divisor = getDivisor();
+        _decreaseBalance(_sender, _amount, divisor);
+        _increaseBalance(_recipient, _amount, divisor);
 
         emit Transfer(_sender, _recipient, _amount);
     }
@@ -102,8 +114,9 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         require(_account != address(0), "X2Token: mint to the zero address");
         unlockTimestamps[_account] = IX2Market(market).getNextUnlockTime();
 
-        balances[_account] = balances[_account].add(_amount);
-        _totalSupply = _totalSupply.add(_amount);
+        uint256 divisor = getDivisor();
+        _increaseBalance(_account, _amount, divisor);
+
         emit Transfer(address(0), _account, _amount);
     }
 
@@ -111,8 +124,9 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         require(_account != address(0), "X2Token: burn from the zero address");
         require(unlocked(_account), "X2Token: account not yet unlocked");
 
-        balances[_account] = balances[_account].sub(_amount, "X2Token: burn amount exceeds balance");
-        _totalSupply = _totalSupply.sub(_amount);
+        uint256 divisor = getDivisor();
+        _decreaseBalance(_account, _amount, divisor);
+
         emit Transfer(_account, address(0), _amount);
     }
 
@@ -124,19 +138,19 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         emit Approval(_owner, _spender, _amount);
     }
 
-    function _increaseBalance(address _account, uint256 _amount) private {
+    function _increaseBalance(address _account, uint256 _amount, uint256 _divisor) private {
         if (_amount == 0) { return; }
 
-        uint256 scaledAmount = _amount.mul(divisor());
-        balances[_account] = balances[_account].add(divisor());
+        uint256 scaledAmount = _amount.mul(_divisor);
+        balances[_account] = balances[_account].add(scaledAmount);
         _totalSupply = _totalSupply.add(scaledAmount);
     }
 
-    function _decreaseBalance(address _account, uint256 _amount) private {
+    function _decreaseBalance(address _account, uint256 _amount, uint256 _divisor) private {
         if (_amount == 0) { return; }
 
-        uint256 scaledAmount = _amount.mul(divisor());
-        balances[_account] = balances[_account].sub(divisor());
+        uint256 scaledAmount = _amount.mul(_divisor);
+        balances[_account] = balances[_account].sub(scaledAmount);
         _totalSupply = _totalSupply.sub(scaledAmount);
     }
 }

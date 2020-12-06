@@ -40,6 +40,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public nextRebaseTime;
 
     mapping (address => uint256) public cachedDivisors;
+    mapping (address => uint256) public totalSupply;
+    mapping (address => uint256) public _totalSupply;
 
     modifier onlyBullBearTokens() {
         require(msg.sender == bullToken || msg.sender == bearToken, "X2Market: forbidden");
@@ -74,23 +76,29 @@ contract X2Market is IX2Market, ReentrancyGuard {
         _setNextRebaseTime();
     }
 
-    function deposit(uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
+    function deposit(address _account, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
+        rebase();
+
         _collectFees(_amount);
 
         uint256 balance = IERC20(collateralToken).balanceOf(address(this));
-        uint256 amount = balance.sub(reserve).sub(feeReserve);
-        require(amount >= _amount, "X2Market: insufficient input amount");
+        uint256 receivedAmount = balance.sub(reserve).sub(feeReserve);
+        require(receivedAmount >= _amount, "X2Market: insufficient input amount");
 
+        IX2Token(msg.sender).mint(_account, _amount);
         _updateReserve();
         return _amount;
     }
 
-    function withdraw(address _receiver, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
+    function withdraw(address _account, address _receiver, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
+        rebase();
+
         uint256 fee = _collectFees(_amount);
 
         uint256 withdrawAmount = _amount.sub(fee);
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 
+        IX2Token(msg.sender).burn(_account, _amount);
         _updateReserve();
         return withdrawAmount;
     }
@@ -114,6 +122,12 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
         cachedDivisors[bullToken] = getDivisor(bullToken);
         cachedDivisors[bearToken] = getDivisor(bearToken);
+
+        totalSupply[bullToken] = IERC20(bullToken).totalSupply();
+        totalSupply[bearToken] = IERC20(bearToken).totalSupply();
+
+        _totalSupply[bullToken] = IX2Token(bullToken)._totalSupply();
+        _totalSupply[bearToken] = IX2Token(bearToken)._totalSupply();
     }
 
     function latestPrice() public view returns (uint256) {
@@ -123,8 +137,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function getDivisor(address _token) public override view returns (uint256) {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
 
-        uint256 totalBulls = IERC20(bullToken).totalSupply();
-        uint256 totalBears = IERC20(bearToken).totalSupply();
+        uint256 totalBulls = totalSupply[bullToken];
+        uint256 totalBears = totalSupply[bearToken];
 
         uint256 nextPrice = latestPrice();
 
@@ -149,7 +163,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function _getNextDivisor(address _token, uint256 _nextSupply) private view returns (uint256) {
-        return IX2Token(_token)._totalSupply().div(_nextSupply);
+        return _totalSupply[_token].div(_nextSupply);
     }
 
     function _setNextRebaseTime() private {
