@@ -73,6 +73,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         cachedDivisors[bearToken] = INITIAL_REBASE_DIVISOR;
 
         lastPrice = latestPrice();
+        require(lastPrice != 0, "X2Market: unsupported price feed");
+
         _setNextRebaseTime();
     }
 
@@ -131,7 +133,10 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function latestPrice() public view returns (uint256) {
-        return IX2PriceFeed(priceFeed).latestAnswer();
+        uint256 answer = IX2PriceFeed(priceFeed).latestAnswer();
+        // do not allow zero values here
+        if (answer == 0) { return lastPrice; }
+        return answer;
     }
 
     function getDivisor(address _token) public override view returns (uint256) {
@@ -163,6 +168,9 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function _getNextDivisor(address _token, uint256 _nextSupply) private view returns (uint256) {
+        if (_nextSupply == 0) {
+            return INITIAL_REBASE_DIVISOR;
+        }
         return _totalSupply[_token].div(_nextSupply);
     }
 
