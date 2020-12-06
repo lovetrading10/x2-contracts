@@ -28,7 +28,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
     address public bullToken;
     address public bearToken;
     address public priceFeed;
-    uint256 public interval;
     uint256 public unlockDelay;
     uint256 public maxProfitBasisPoints;
 
@@ -37,7 +36,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public feeTokenReserve;
 
     uint256 public lastPrice;
-    uint256 public nextRebaseTime;
 
     mapping (address => uint256) public cachedDivisors;
     mapping (address => uint256) public totalSupply;
@@ -55,7 +53,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address _bullToken,
         address _bearToken,
         address _priceFeed,
-        uint256 _interval,
         uint256 _unlockDelay,
         uint256 _maxProfitBasisPoints
     ) public {
@@ -65,7 +62,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
         bullToken = _bullToken;
         bearToken = _bearToken;
         priceFeed = _priceFeed;
-        interval = _interval;
         unlockDelay = _unlockDelay;
         maxProfitBasisPoints = _maxProfitBasisPoints;
 
@@ -74,8 +70,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
         lastPrice = latestPrice();
         require(lastPrice != 0, "X2Market: unsupported price feed");
-
-        _setNextRebaseTime();
     }
 
     function deposit(address _account, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
@@ -119,9 +113,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function rebase() public override returns (bool) {
-        if (block.timestamp < nextRebaseTime) { return false; }
-        _setNextRebaseTime();
-
         cachedDivisors[bullToken] = getDivisor(bullToken);
         cachedDivisors[bearToken] = getDivisor(bearToken);
 
@@ -134,7 +125,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
     function latestPrice() public view returns (uint256) {
         uint256 answer = IX2PriceFeed(priceFeed).latestAnswer();
-        // do not allow zero values here
+        // prevent zero from being returned
         if (answer == 0) { return lastPrice; }
         return answer;
     }
@@ -172,11 +163,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
             return INITIAL_REBASE_DIVISOR;
         }
         return _totalSupply[_token].div(_nextSupply);
-    }
-
-    function _setNextRebaseTime() private {
-        uint256 roundedTime = block.timestamp.div(interval).mul(interval);
-        nextRebaseTime = roundedTime.add(interval);
     }
 
     function _updateReserve() private {
