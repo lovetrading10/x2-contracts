@@ -86,7 +86,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function deposit(address _account, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
         rebase();
 
-        _collectFees(_amount);
+        _collectFees(_amount, true);
 
         uint256 balance = IERC20(collateralToken).balanceOf(address(this));
         uint256 receivedAmount = balance.sub(reserve).sub(feeReserve);
@@ -101,7 +101,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function withdraw(address _account, address _receiver, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
         rebase();
 
-        uint256 fee = _collectFees(_amount);
+        uint256 fee = _collectFees(_amount, false);
 
         uint256 withdrawAmount = _amount.sub(fee);
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
@@ -193,10 +193,10 @@ contract X2Market is IX2Market, ReentrancyGuard {
         reserve = IERC20(collateralToken).balanceOf(address(this)).sub(feeReserve);
     }
 
-    function _collectFees(uint256 _amount) private returns (uint256) {
+    function _collectFees(uint256 _amount, bool _allowFeeSubsidy) private returns (uint256) {
         uint256 fee = IX2Factory(factory).getFee(_amount);
 
-        if (collateralToken == IX2Router(router).weth()) {
+        if (_allowFeeSubsidy && collateralToken == IX2Router(router).weth()) {
             address feeToken = IX2Factory(factory).feeToken();
             uint256 feeTokenBalance = IERC20(feeToken).balanceOf(address(this));
             uint256 subsidy = feeTokenBalance.sub(feeTokenReserve);
