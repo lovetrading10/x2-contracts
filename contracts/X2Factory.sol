@@ -6,6 +6,8 @@ import "./libraries/math/SafeMath.sol";
 import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2Factory.sol";
+import "./X2Market.sol";
+import "./X2Token.sol";
 
 contract X2Factory is IX2Factory {
     using SafeMath for uint256;
@@ -17,9 +19,14 @@ contract X2Factory is IX2Factory {
     address public gov;
     address public override feeReceiver;
     address public override feeToken;
+    address public router;
+
+    address[] public allMarkets;
+
+    bool public freeMarketCreation = false;
 
     modifier onlyGov() {
-        require(msg.sender == gov, "X2Market: forbidden");
+        require(msg.sender == gov, "X2Factory: forbidden");
         _;
     }
 
@@ -28,15 +35,60 @@ contract X2Factory is IX2Factory {
         gov = msg.sender;
     }
 
-    function setGov(address _gov) public onlyGov {
+    function setRouter(address _router) external onlyGov {
+        require(router == address(0), "X2Factory: router already set");
+        router = _router;
+    }
+
+    function allMarketsLength() external view returns (uint256) {
+        return allMarkets.length;
+    }
+
+    function enableFreeMarketCreation() external onlyGov {
+        freeMarketCreation = true;
+    }
+
+    function createMarket(
+        address _collateralToken,
+        address _priceFeed,
+        uint256 _multiplier,
+        uint256 _unlockDelay,
+        uint256 _maxProfitBasisPoints
+    ) external returns (address, address, address) {
+        if (!freeMarketCreation) {
+            require(msg.sender == gov, "X2Factory: forbidden");
+        }
+
+        X2Market market = new X2Market(
+            address(this),
+            router,
+            _collateralToken,
+            _priceFeed,
+            _multiplier,
+            _unlockDelay,
+            _maxProfitBasisPoints
+        );
+
+        X2Token bullToken = new X2Token(address(market), router);
+        X2Token bearToken = new X2Token(address(market), router);
+
+        market.setBullToken(address(bullToken));
+        market.setBearToken(address(bearToken));
+
+        allMarkets.push(address(market));
+
+        return (address(market), address(bullToken), address(bearToken));
+    }
+
+    function setGov(address _gov) external onlyGov {
         gov = _gov;
     }
 
-    function setFeeReceiver(address _feeReceiver) public onlyGov {
+    function setFeeReceiver(address _feeReceiver) external onlyGov {
         feeReceiver = _feeReceiver;
     }
 
-    function getFee(uint256 _amount) public override view returns (uint256) {
+    function getFee(uint256 _amount) external override view returns (uint256) {
         if (feeReceiver == address(0)) {
             return 0;
         }

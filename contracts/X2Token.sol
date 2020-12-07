@@ -15,12 +15,13 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    string public name;
-    string public symbol;
-    uint8 public decimals;
+    string public constant name = 'X2 Token';
+    string public constant symbol = 'X2';
+    uint8 public constant decimals = 18;
+
     uint256 public override _totalSupply;
 
-    address public market;
+    address public override market;
     address public router;
 
     mapping (address => uint256) public balances;
@@ -38,9 +39,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _;
     }
 
-    constructor(string memory _name, string memory _symbol, address _market, address _router) public {
-        name = _name;
-        symbol = _symbol;
+    constructor(address _market, address _router) public {
         market = _market;
         router = _router;
     }
@@ -99,6 +98,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
+        IX2Market(market).rebase();
+
         require(unlocked(_sender), "X2Token: account not yet unlocked");
         require(_sender != address(0), "X2Token: transfer from the zero address");
         require(_recipient != address(0), "X2Token: transfer to the zero address");

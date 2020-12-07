@@ -19,7 +19,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
-    uint256 public constant INITIAL_REBASE_DIVISOR = 10**8;
+    uint256 public constant INITIAL_REBASE_DIVISOR = 10**20;
 
     address public factory;
     address public router;
@@ -28,6 +28,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     address public bullToken;
     address public bearToken;
     address public priceFeed;
+    uint256 public multiplier;
     uint256 public unlockDelay;
     uint256 public maxProfitBasisPoints;
 
@@ -38,11 +39,14 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public lastPrice;
 
     mapping (address => uint256) public cachedDivisors;
-    mapping (address => uint256) public totalSupply;
-    mapping (address => uint256) public _totalSupply;
 
     modifier onlyBullBearTokens() {
         require(msg.sender == bullToken || msg.sender == bearToken, "X2Market: forbidden");
+        _;
+    }
+
+    modifier onlyFactory() {
+        require(msg.sender == factory, "X2Market: forbidden");
         _;
     }
 
@@ -50,26 +54,33 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address _factory,
         address _router,
         address _collateralToken,
-        address _bullToken,
-        address _bearToken,
         address _priceFeed,
+        uint256 _multiplier,
         uint256 _unlockDelay,
         uint256 _maxProfitBasisPoints
     ) public {
         factory = _factory;
         router = _router;
         collateralToken = _collateralToken;
-        bullToken = _bullToken;
-        bearToken = _bearToken;
         priceFeed = _priceFeed;
+        multiplier = _multiplier;
         unlockDelay = _unlockDelay;
         maxProfitBasisPoints = _maxProfitBasisPoints;
 
-        cachedDivisors[bullToken] = INITIAL_REBASE_DIVISOR;
-        cachedDivisors[bearToken] = INITIAL_REBASE_DIVISOR;
-
         lastPrice = latestPrice();
         require(lastPrice != 0, "X2Market: unsupported price feed");
+    }
+
+    function setBullToken(address _bullToken) public onlyFactory {
+        require(bullToken == address(0), "X2Market: bullToken already set");
+        bullToken = _bullToken;
+        cachedDivisors[bullToken] = INITIAL_REBASE_DIVISOR;
+    }
+
+    function setBearToken(address _bearToken) public onlyFactory {
+        require(bearToken == address(0), "X2Market: bearToken already set");
+        bearToken = _bearToken;
+        cachedDivisors[bearToken] = INITIAL_REBASE_DIVISOR;
     }
 
     function deposit(address _account, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
@@ -82,6 +93,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         require(receivedAmount >= _amount, "X2Market: insufficient input amount");
 
         IX2Token(msg.sender).mint(_account, _amount);
+
         _updateReserve();
         return _amount;
     }
@@ -95,6 +107,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 
         IX2Token(msg.sender).burn(_account, _amount);
+
         _updateReserve();
         return withdrawAmount;
     }
@@ -115,12 +128,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function rebase() public override returns (bool) {
         cachedDivisors[bullToken] = getDivisor(bullToken);
         cachedDivisors[bearToken] = getDivisor(bearToken);
-
-        totalSupply[bullToken] = IERC20(bullToken).totalSupply();
-        totalSupply[bearToken] = IERC20(bearToken).totalSupply();
-
-        _totalSupply[bullToken] = IX2Token(bullToken)._totalSupply();
-        _totalSupply[bearToken] = IX2Token(bearToken)._totalSupply();
+        lastPrice = latestPrice();
     }
 
     function latestPrice() public view returns (uint256) {
@@ -133,8 +141,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function getDivisor(address _token) public override view returns (uint256) {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
 
-        uint256 totalBulls = totalSupply[bullToken];
-        uint256 totalBears = totalSupply[bearToken];
+        uint256 totalBulls = cachedTotalSupply(bullToken);
+        uint256 totalBears = cachedTotalSupply(bearToken);
 
         uint256 nextPrice = latestPrice();
 
@@ -142,11 +150,14 @@ contract X2Market is IX2Market, ReentrancyGuard {
             return cachedDivisors[_token];
         }
 
+        // refSupply is the smaller of the two supplies
         uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
-        uint256 maxProfit = refSupply.mul(maxProfitBasisPoints).div(BASIS_POINTS_DIVISOR);
-        uint256 movement = nextPrice > lastPrice ? nextPrice.sub(lastPrice) : lastPrice.sub(nextPrice);
-        uint256 profit = refSupply.mul(movement).div(lastPrice);
+        uint256 delta = nextPrice > lastPrice ? nextPrice.sub(lastPrice) : lastPrice.sub(nextPrice);
+        // profit is [(smaller supply) * (change in price) / (last price)] * multiplier
+        uint256 profit = refSupply.mul(delta).div(lastPrice).mul(multiplier);
 
+        // cap the profit to the (max profit percentage) of the smaller supply
+        uint256 maxProfit = refSupply.mul(maxProfitBasisPoints).div(BASIS_POINTS_DIVISOR);
         if (profit > maxProfit) { profit = maxProfit; }
 
         if (_token == bullToken) {
@@ -158,11 +169,20 @@ contract X2Market is IX2Market, ReentrancyGuard {
         return _getNextDivisor(_token, nextSupply);
     }
 
+    function cachedTotalSupply(address _token) public view returns (uint256) {
+        return IX2Token(_token)._totalSupply().div(cachedDivisors[_token]);
+    }
+
     function _getNextDivisor(address _token, uint256 _nextSupply) private view returns (uint256) {
         if (_nextSupply == 0) {
             return INITIAL_REBASE_DIVISOR;
         }
-        return _totalSupply[_token].div(_nextSupply);
+
+        uint256 divisor = IX2Token(_token)._totalSupply().div(_nextSupply);
+        // prevent the cachedDivisor from being set to 0
+        if (divisor == 0) { return cachedDivisors[_token]; }
+
+        return divisor;
     }
 
     function _updateReserve() private {
