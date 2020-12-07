@@ -1,6 +1,12 @@
 # X2
 
-Contracts for the X2 system. [More info](https://xvix.medium.com/x2-the-next-stage-for-xvix-b7dfbf59dee7).
+Contracts for the X2 protocol.
+
+The X2 protocol allows rebasing bull and bear tokens to be minted using any collateral token.
+At anytime, all bull and bear tokens are redeemable for the collateral token at a 1:1 ratio.
+
+The protocol uses [Chainlink](https://chain.link/) price feeds to determine rebasing amounts.
+[More info](https://xvix.medium.com/x2-the-next-stage-for-xvix-b7dfbf59dee7).
 
 ## X2 Contracts
 
