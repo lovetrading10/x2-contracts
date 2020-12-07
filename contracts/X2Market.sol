@@ -32,7 +32,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public unlockDelay;
     uint256 public maxProfitBasisPoints;
 
-    uint256 public reserve;
     uint256 public feeReserve;
     uint256 public feeTokenReserve;
 
@@ -86,29 +85,22 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function deposit(address _account, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
         rebase();
 
-        _collectFees(_amount, true);
+        uint256 fee = _collectFees(_amount, true);
+        uint256 depositAmount = _amount.sub(fee);
+        IX2Token(msg.sender).mint(_account, depositAmount);
 
-        uint256 balance = IERC20(collateralToken).balanceOf(address(this));
-        uint256 receivedAmount = balance.sub(reserve).sub(feeReserve);
-        require(receivedAmount >= _amount, "X2Market: insufficient input amount");
-
-        IX2Token(msg.sender).mint(_account, _amount);
-
-        _updateReserve();
-        return _amount;
+        return depositAmount;
     }
 
     function withdraw(address _account, address _receiver, uint256 _amount) public override onlyBullBearTokens nonReentrant returns (uint256) {
         rebase();
 
-        uint256 fee = _collectFees(_amount, false);
+        IX2Token(msg.sender).burn(_account, _amount);
 
+        uint256 fee = _collectFees(_amount, false);
         uint256 withdrawAmount = _amount.sub(fee);
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 
-        IX2Token(msg.sender).burn(_account, _amount);
-
-        _updateReserve();
         return withdrawAmount;
     }
 
@@ -187,10 +179,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
         if (divisor == 0) { return cachedDivisors[_token]; }
 
         return divisor;
-    }
-
-    function _updateReserve() private {
-        reserve = IERC20(collateralToken).balanceOf(address(this)).sub(feeReserve);
     }
 
     function _collectFees(uint256 _amount, bool _allowFeeSubsidy) private returns (uint256) {

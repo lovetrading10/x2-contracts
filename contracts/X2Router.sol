@@ -106,9 +106,7 @@ contract X2Router is IX2Router {
     }
 
     function _deposit(address _token, uint256 _amount) private {
-        uint256 fee = IX2Factory(factory).getFee(_amount);
-        uint256 depositAmount = _amount.sub(fee);
-        IX2Token(_token).deposit(msg.sender, depositAmount);
+        IX2Token(_token).deposit(msg.sender, _amount);
     }
 
     function _withdraw(address _token, uint256 _amount, address _receiver) private returns (uint256) {
