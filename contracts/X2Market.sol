@@ -126,8 +126,12 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function rebase() public override returns (bool) {
-        cachedDivisors[bullToken] = getDivisor(bullToken);
-        cachedDivisors[bearToken] = getDivisor(bearToken);
+        // store the divisor values as updating cachedDivisors will change the
+        // value returned from getDivisor
+        uint256 bullDivisor = getDivisor(bullToken);
+        uint256 bearDivisor = getDivisor(bearToken);
+        cachedDivisors[bullToken] = bullDivisor;
+        cachedDivisors[bearToken] = bearDivisor;
         lastPrice = latestPrice();
     }
 

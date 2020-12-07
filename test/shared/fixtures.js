@@ -22,8 +22,8 @@ async function loadFixtures(provider, wallet) {
   await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
 
   const tx = await factory.createMarket(
-    "3X BULL ETH/USD",
-    "3X BEAR ETH/USD",
+    "X2:3XBULL:ETH/USD",
+    "X2:3XBEAR:ETH/USD",
     weth.address,
     priceFeed.address,
     3, // multiplier
