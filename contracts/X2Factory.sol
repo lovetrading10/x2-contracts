@@ -49,6 +49,8 @@ contract X2Factory is IX2Factory {
     }
 
     function createMarket(
+        string memory _bullTokenSymbol,
+        string memory _bearTokenSymbol,
         address _collateralToken,
         address _priceFeed,
         uint256 _multiplier,
@@ -69,8 +71,8 @@ contract X2Factory is IX2Factory {
             _maxProfitBasisPoints
         );
 
-        X2Token bullToken = new X2Token(address(market), router);
-        X2Token bearToken = new X2Token(address(market), router);
+        X2Token bullToken = new X2Token(address(market), router, _bullTokenSymbol);
+        X2Token bearToken = new X2Token(address(market), router, _bearTokenSymbol);
 
         market.setBullToken(address(bullToken));
         market.setBearToken(address(bearToken));

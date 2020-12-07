@@ -15,8 +15,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    string public constant name = 'X2 Token';
-    string public constant symbol = 'X2';
+    string public name;
+    string public symbol;
     uint8 public constant decimals = 18;
 
     uint256 public override _totalSupply;
@@ -39,9 +39,11 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _;
     }
 
-    constructor(address _market, address _router) public {
+    constructor(address _market, address _router, string memory _symbol) public {
         market = _market;
         router = _router;
+        name = _symbol;
+        symbol = _symbol;
     }
 
     function deposit(address _account, uint256 _amount) public override onlyRouter nonReentrant returns (uint256) {
