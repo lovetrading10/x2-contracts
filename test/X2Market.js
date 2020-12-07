@@ -395,7 +395,8 @@ describe("X2Market", function () {
 
     await market.rebase()
 
-    await router.connect(user2).depositETH(bullToken.address, maxUint256, { value: expandDecimals(26, 18) })
+    const tx = await router.connect(user2).depositETH(bullToken.address, maxUint256, { value: expandDecimals(26, 18) })
+    await reportGasUsed(provider, tx, "depositETH gas used")
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(46, 18))
 
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(13, 18))
