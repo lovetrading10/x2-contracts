@@ -32,7 +32,7 @@ async function loadFixtures(provider, wallet) {
   )
   // reportGasUsed(provider, tx, "createMarket gas used")
 
-  const marketAddress = await factory.allMarkets(0)
+  const marketAddress = await factory.markets(0)
   const market = await contractAt("X2Market", marketAddress)
   const bullToken = await contractAt("X2Token", await market.bullToken())
   const bearToken = await contractAt("X2Token", await market.bearToken())

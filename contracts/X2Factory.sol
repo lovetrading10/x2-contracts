@@ -21,7 +21,7 @@ contract X2Factory is IX2Factory {
     address public override feeToken;
     address public router;
 
-    address[] public allMarkets;
+    address[] public markets;
 
     bool public freeMarketCreation = false;
 
@@ -40,8 +40,8 @@ contract X2Factory is IX2Factory {
         router = _router;
     }
 
-    function allMarketsLength() external view returns (uint256) {
-        return allMarkets.length;
+    function marketsLength() external view returns (uint256) {
+        return markets.length;
     }
 
     function enableFreeMarketCreation() external onlyGov {
@@ -77,7 +77,7 @@ contract X2Factory is IX2Factory {
         market.setBullToken(address(bullToken));
         market.setBearToken(address(bearToken));
 
-        allMarkets.push(address(market));
+        markets.push(address(market));
 
         return (address(market), address(bullToken), address(bearToken));
     }
