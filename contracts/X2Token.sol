@@ -46,14 +46,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         symbol = _symbol;
     }
 
-    function deposit(address _account, uint256 _amount) public override onlyRouter nonReentrant returns (uint256) {
-        return IX2Market(market).deposit(_account, _amount);
-    }
-
-    function withdraw(address _account, address _receiver, uint256 _amount) public override onlyRouter nonReentrant returns (uint256) {
-        return IX2Market(market).withdraw(_account, _receiver, _amount);
-    }
-
     function mint(address _account, uint256 _amount) public override onlyMarket {
         _mint(_account, _amount);
     }

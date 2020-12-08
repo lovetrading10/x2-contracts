@@ -13,7 +13,7 @@ import "./interfaces/IX2Router.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
 
-contract X2Router is IX2Router {
+contract X2Router is IX2Router, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -38,22 +38,22 @@ contract X2Router is IX2Router {
         address _token,
         uint256 _amount,
         uint256 _deadline
-    ) external ensureDeadline(_deadline) {
+    ) external nonReentrant ensureDeadline(_deadline) {
         address market = IX2Token(_token).market();
         address collateralToken = IX2Market(market).collateralToken();
         IERC20(collateralToken).safeTransferFrom(msg.sender, market, _amount);
-        _deposit(_token, _amount);
+        _deposit(market, _token, _amount, 0);
     }
 
     function depositETH(
         address _token,
         uint256 _deadline
-    ) external payable ensureDeadline(_deadline) {
+    ) external payable nonReentrant ensureDeadline(_deadline) {
         address market = IX2Token(_token).market();
         uint256 amount = msg.value;
         IWETH(weth).deposit{value: amount}();
         require(IWETH(weth).transfer(market, amount), "X2Router: weth transfer failed");
-        _deposit(_token, amount);
+        _deposit(market, _token, amount, 0);
     }
 
     function depositSupportingFeeSubsidy(
@@ -61,27 +61,25 @@ contract X2Router is IX2Router {
         uint256 _amount,
         uint256 _subsidy,
         uint256 _deadline
-    ) external ensureDeadline(_deadline) {
+    ) external nonReentrant ensureDeadline(_deadline) {
         address market = IX2Token(_token).market();
         address collateralToken = IX2Market(market).collateralToken();
         IERC20(collateralToken).safeTransferFrom(msg.sender, market, _amount);
-        address feeToken = IX2Factory(factory).feeToken();
-        IERC20(feeToken).safeTransferFrom(msg.sender, market, _subsidy);
-        _deposit(_token, _amount);
+        _collectFeeToken(market, _subsidy);
+        _deposit(market, _token, _amount, _subsidy);
     }
 
     function depositETHSupportingFeeSubsidy(
         address _token,
         uint256 _subsidy,
         uint256 _deadline
-    ) external payable ensureDeadline(_deadline) {
+    ) external payable nonReentrant ensureDeadline(_deadline) {
         address market = IX2Token(_token).market();
         uint256 amount = msg.value;
         IWETH(weth).deposit{value: amount}();
         require(IWETH(weth).transfer(market, amount), "X2Router: weth transfer failed");
-        address feeToken = IX2Factory(factory).feeToken();
-        IERC20(feeToken).safeTransferFrom(msg.sender, market, _subsidy);
-        _deposit(_token, amount);
+        _collectFeeToken(market, _subsidy);
+        _deposit(market, _token, amount, _subsidy);
     }
 
     function withdraw(
@@ -89,8 +87,9 @@ contract X2Router is IX2Router {
         uint256 _amount,
         address _receiver,
         uint256 _deadline
-    ) external ensureDeadline(_deadline) {
-        _withdraw(_token, _amount, _receiver);
+    ) external nonReentrant ensureDeadline(_deadline) {
+        address market = IX2Token(_token).market();
+        _withdraw(market, _token, _amount, _receiver);
     }
 
     function withdrawETH(
@@ -98,18 +97,24 @@ contract X2Router is IX2Router {
         uint256 _amount,
         address _receiver,
         uint256 _deadline
-    ) external ensureDeadline(_deadline) {
-        uint256 withdrawAmount = _withdraw(_token, _amount, address(this));
+    ) external nonReentrant ensureDeadline(_deadline) {
+        address market = IX2Token(_token).market();
+        uint256 withdrawAmount = _withdraw(market, _token, _amount, address(this));
         IWETH(weth).withdraw(withdrawAmount);
         (bool success,) = _receiver.call{value: withdrawAmount}("");
         require(success, "X2Token: eth transfer failed");
     }
 
-    function _deposit(address _token, uint256 _amount) private {
-        IX2Token(_token).deposit(msg.sender, _amount);
+    function _collectFeeToken(address _market, uint256 _subsidy) private {
+        address feeToken = IX2Factory(factory).feeToken();
+        IERC20(feeToken).safeTransferFrom(msg.sender, _market, _subsidy);
     }
 
-    function _withdraw(address _token, uint256 _amount, address _receiver) private returns (uint256) {
-        return IX2Token(_token).withdraw(msg.sender, _receiver, _amount);
+    function _deposit(address _market, address _token, uint256 _amount, uint256 _feeSubsidy) private returns (uint256) {
+        return IX2Market(_market).deposit(msg.sender, _token, _amount, _feeSubsidy);
+    }
+
+    function _withdraw(address _market, address _token, uint256 _amount, address _receiver) private returns (uint256) {
+        return IX2Market(_market).withdraw(msg.sender, _token, _amount, _receiver);
     }
 }

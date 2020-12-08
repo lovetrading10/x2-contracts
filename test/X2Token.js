@@ -20,9 +20,6 @@ describe("X2Token", function () {
   })
 
   it("deposit", async () => {
-    await expect(bullToken.deposit(user0.address, 100))
-      .to.be.revertedWith("X2Token: forbidden")
-
     expect(await bullToken.unlockTimestamps(user0.address)).eq(0)
 
     await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 100 })
@@ -32,9 +29,6 @@ describe("X2Token", function () {
   })
 
   it("withdraw", async () => {
-    await expect(bullToken.withdraw(user0.address, user1.address, 100))
-      .to.be.revertedWith("X2Token: forbidden")
-
     await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 100 })
     expect(await bullToken.balanceOf(user0.address)).eq(100)
 
