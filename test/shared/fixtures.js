@@ -14,6 +14,7 @@ async function contractAt(name, address) {
 async function loadFixtures(provider, wallet) {
   const weth = await deployContract("WETH", [])
   const feeToken = await deployContract("X2Fee", [expandDecimals(1000, 18)])
+  const feeReceiver = await deployContract("X2FeeReceiver", [])
   const factory = await deployContract("X2Factory", [feeToken.address])
   const router = await deployContract("X2Router", [factory.address, weth.address])
   await factory.setRouter(router.address)
@@ -37,7 +38,7 @@ async function loadFixtures(provider, wallet) {
   const bullToken = await contractAt("X2Token", await market.bullToken())
   const bearToken = await contractAt("X2Token", await market.bearToken())
 
-  return { weth, feeToken, factory, router, priceFeed, market, bullToken, bearToken }
+  return { weth, feeToken, feeReceiver, factory, router, priceFeed, market, bullToken, bearToken }
 }
 
 module.exports = {

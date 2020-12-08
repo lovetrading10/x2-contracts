@@ -40,6 +40,10 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
     mapping (address => uint256) public cachedDivisors;
 
+    event Fee(uint256 fee, uint256 subsidy);
+    event PriceChange(uint256 price);
+    event DistributeFees(uint256 fees);
+
     modifier onlyRouter() {
         require(msg.sender == router, "X2Market: forbidden");
         _;
@@ -84,7 +88,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function deposit(address _account, address _token, uint256 _amount, uint256 _feeSubsidy) public override onlyRouter returns (uint256) {
-        _guardToken(_token);
+        require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
         rebase();
 
         uint256 fee = _collectFees(_amount, _feeSubsidy);
@@ -95,7 +99,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function withdraw(address _account, address _token, uint256 _amount, address _receiver) public override onlyRouter returns (uint256) {
-        _guardToken(_token);
+        require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
         rebase();
 
         IX2Token(_token).burn(_account, _amount);
@@ -117,6 +121,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
         IERC20(collateralToken).safeTransfer(feeReceiver, feeReserve);
         IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, feeReserve);
+        emit DistributeFees(feeReserve);
         feeReserve = 0;
     }
 
@@ -127,7 +132,9 @@ contract X2Market is IX2Market, ReentrancyGuard {
         uint256 bearDivisor = getDivisor(bearToken);
         cachedDivisors[bullToken] = bullDivisor;
         cachedDivisors[bearToken] = bearDivisor;
-        lastPrice = latestPrice();
+        uint256 nextPrice = latestPrice();
+        lastPrice = nextPrice;
+        emit PriceChange(nextPrice);
     }
 
     function latestPrice() public view returns (uint256) {
@@ -191,10 +198,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
         fee = fee.sub(_feeSubsidy);
         feeReserve = feeReserve.add(fee);
-        return fee;
-    }
 
-    function _guardToken(address _token) private view {
-        require(_token == bullToken || _token == bearToken, "X2: unsupported token");
+        emit Fee(fee, _feeSubsidy);
+        return fee;
     }
 }

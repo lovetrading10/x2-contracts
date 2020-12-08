@@ -82,7 +82,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
         address _receiver,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
-        address market = IX2Token(_token).market();
+        address market = _getMarket(_token);
         _withdraw(market, _token, _amount, _receiver);
     }
 
@@ -92,7 +92,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
         address _receiver,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
-        address market = IX2Token(_token).market();
+        address market = _getMarket(_token);
         require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
 
         uint256 withdrawAmount = _withdraw(market, _token, _amount, address(this));

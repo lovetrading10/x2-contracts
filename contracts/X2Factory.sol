@@ -27,6 +27,21 @@ contract X2Factory is IX2Factory {
     mapping (address => uint256) public feeBasisPoints;
     mapping (address => bool) public override isMarket;
 
+    event CreateMarket(
+        string bullToken,
+        string bearToken,
+        address collateralToken,
+        address priceFeed,
+        uint256 multiplier,
+        uint256 unlockDelay,
+        uint256 maxProfitBasisPoints,
+        uint256 index
+    );
+
+    event GovChange(address gov);
+    event FeeChange(address market, uint256 fee);
+    event FeeReceiverChange(address feeReceiver);
+
     modifier onlyGov() {
         require(msg.sender == gov, "X2Factory: forbidden");
         _;
@@ -82,20 +97,34 @@ contract X2Factory is IX2Factory {
         markets.push(address(market));
         isMarket[address(market)] = true;
 
+        emit CreateMarket(
+            _bullTokenSymbol,
+            _bearTokenSymbol,
+            _collateralToken,
+            _priceFeed,
+            _multiplier,
+            _unlockDelay,
+            _maxProfitBasisPoints,
+            markets.length - 1
+        );
+
         return (address(market), address(bullToken), address(bearToken));
     }
 
     function setGov(address _gov) external onlyGov {
         gov = _gov;
+        emit GovChange(gov);
     }
 
     function setFee(address _market, uint256 _feeBasisPoints) external onlyGov {
         require(_feeBasisPoints <= MAX_FEE_BASIS_POINTS, "X2Factory: fee exceeds allowed limit");
         feeBasisPoints[_market] = _feeBasisPoints;
+        emit FeeChange(_market, _feeBasisPoints);
     }
 
     function setFeeReceiver(address _feeReceiver) external onlyGov {
         feeReceiver = _feeReceiver;
+        emit FeeReceiverChange(feeReceiver);
     }
 
     function getFee(address _market, uint256 _amount) external override view returns (uint256) {
