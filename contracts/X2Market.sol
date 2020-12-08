@@ -112,9 +112,9 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address feeReceiver = IX2Factory(factory).feeReceiver();
         require(feeReceiver != address(0), "X2Market: empty feeReceiver");
 
-        feeReserve = 0;
         IERC20(collateralToken).safeTransfer(feeReceiver, feeReserve);
         IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, feeReserve);
+        feeReserve = 0;
     }
 
     function rebase() public override returns (bool) {
@@ -182,7 +182,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function _collectFees(uint256 _amount, uint256 _feeSubsidy) private returns (uint256) {
-        uint256 fee = IX2Factory(factory).getFee(_amount);
+        uint256 fee = IX2Factory(factory).getFee(address(this), _amount);
         if (fee == 0) { return 0; }
         if (_feeSubsidy >= fee) { return 0; }
 

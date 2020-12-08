@@ -13,7 +13,7 @@ contract X2Factory is IX2Factory {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    uint256 public constant FEE_BASIS_POINTS = 20;
+    uint256 public constant MAX_FEE_BASIS_POINTS = 40; // max 0.4% fee
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
 
     address public gov;
@@ -22,8 +22,9 @@ contract X2Factory is IX2Factory {
     address public router;
 
     address[] public markets;
-
     bool public freeMarketCreation = false;
+
+    mapping (address => uint256) public feeBasisPoints;
 
     modifier onlyGov() {
         require(msg.sender == gov, "X2Factory: forbidden");
@@ -86,14 +87,19 @@ contract X2Factory is IX2Factory {
         gov = _gov;
     }
 
+    function setFee(address _market, uint256 _feeBasisPoints) external onlyGov {
+        require(_feeBasisPoints <= MAX_FEE_BASIS_POINTS, "X2Factory: fee exceeds allowed limit");
+        feeBasisPoints[_market] = _feeBasisPoints;
+    }
+
     function setFeeReceiver(address _feeReceiver) external onlyGov {
         feeReceiver = _feeReceiver;
     }
 
-    function getFee(uint256 _amount) external override view returns (uint256) {
+    function getFee(address _market, uint256 _amount) external override view returns (uint256) {
         if (feeReceiver == address(0)) {
             return 0;
         }
-        return _amount.mul(FEE_BASIS_POINTS).div(BASIS_POINTS_DIVISOR);
+        return _amount.mul(feeBasisPoints[_market]).div(BASIS_POINTS_DIVISOR);
     }
 }

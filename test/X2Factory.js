@@ -12,6 +12,7 @@ describe("X2Factory", function () {
   let weth
   let factory
   let router
+  let market
   let priceFeed
   let feeToken
 
@@ -20,6 +21,7 @@ describe("X2Factory", function () {
     weth = fixtures.weth
     factory = fixtures.factory
     router = fixtures.router
+    market = fixtures.market
     priceFeed = fixtures.priceFeed
     feeToken = fixtures.feeToken
   })
@@ -139,9 +141,24 @@ describe("X2Factory", function () {
     expect(await factory.feeReceiver()).eq(user1.address)
   })
 
+  it("setFee", async () => {
+    await expect(factory.setFee(market.address, 41))
+      .to.be.revertedWith("X2Factory: fee exceeds allowed limit")
+
+    await expect(factory.connect(user0).setFee(market.address, 40))
+      .to.be.revertedWith("X2Factory: forbidden")
+
+    expect(await factory.feeBasisPoints(market.address)).eq(0)
+
+    await factory.setFee(market.address, 40)
+    expect(await factory.feeBasisPoints(market.address)).eq(40)
+  })
+
   it("getFee", async () => {
-    expect(await factory.getFee(10000)).eq(0)
+    expect(await factory.getFee(market.address, 20000)).eq(0)
+    await factory.setFee(market.address, 30)
+    expect(await factory.getFee(market.address, 20000)).eq(0)
     await factory.setFeeReceiver(user1.address)
-    expect(await factory.getFee(10000)).eq(20)
+    expect(await factory.getFee(market.address, 20000)).eq(60)
   })
 })
