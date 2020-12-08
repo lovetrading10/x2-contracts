@@ -38,6 +38,24 @@ describe("X2Market", function () {
     expect(await market.maxProfitBasisPoints()).eq(9000)
   })
 
+  it("latestPrice", async () => {
+    expect(await market.latestPrice()).eq(toChainlinkPrice(1000))
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(100))
+    expect(await market.latestPrice()).eq(toChainlinkPrice(100))
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(0))
+    expect(await market.latestPrice()).eq(toChainlinkPrice(1000))
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(2000))
+    expect(await market.latestPrice()).eq(toChainlinkPrice(2000))
+  })
+
+  it("distributeFees", async () => {
+    await expect(market.distributeFees())
+      .to.be.revertedWith("X2Market: empty feeReceiver")
+  })
+
   it("deposit bullToken", async () => {
     expect(await bullToken.totalSupply()).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
@@ -213,10 +231,87 @@ describe("X2Market", function () {
     expect(await provider.getBalance(receiver1.address)).eq(0)
 
     await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(13, 18), receiver0.address, maxUint256)
+
+    expect(await market.cachedDivisors(bullToken.address)).eq("76923076923076923076")
+    expect(await market.cachedDivisors(bearToken.address)).eq("142857142857142857142")
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(2000))
+    await market.rebase()
+
+    expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
+    expect(await market.cachedDivisors(bearToken.address)).eq("142857142857142857142")
+
     await router.connect(user1).withdrawETH(bearToken.address, expandDecimals(7, 18), receiver1.address, maxUint256)
 
     expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(13, 18))
     expect(await provider.getBalance(receiver1.address)).eq(expandDecimals(7, 18))
+
+    expect(await bullToken.balanceOf(user0.address)).eq(0)
+    expect(await bearToken.balanceOf(user1.address)).eq(0)
+    expect(await weth.balanceOf(market.address)).eq(0)
+    expect(await bullToken.totalSupply()).eq(0)
+    expect(await bearToken.totalSupply()).eq(0)
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(2200))
+    await market.rebase()
+
+    expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
+    expect(await market.cachedDivisors(bearToken.address)).eq("100000000000000000000")
+  })
+
+  it("rebase when profit exceeds max profit", async () => {
+    const receiver0 = { address: "0xba58ac30a55bcf22042dcaa5a0b3fed51a2c9617" }
+    const receiver1 = { address: "0x6338723180b802c5a5201f8ed12398eb7da31998" }
+
+    expect(await bullToken.balanceOf(user0.address)).eq(0)
+    expect(await weth.balanceOf(market.address)).eq(0)
+    expect(await bearToken.balanceOf(user1.address)).eq(0)
+    expect(await weth.balanceOf(market.address)).eq(0)
+    expect(await bullToken.totalSupply()).eq(0)
+    expect(await bearToken.totalSupply()).eq(0)
+
+    await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: expandDecimals(10, 18) })
+    expect(await weth.balanceOf(market.address)).eq(expandDecimals(10, 18))
+
+    await router.connect(user1).depositETH(bearToken.address, maxUint256, { value: expandDecimals(10, 18) })
+    expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
+
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
+    expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
+    expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+    expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
+
+    await increaseTime(provider, 61 * 60)
+    await mineBlock(provider)
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1500))
+
+    const bullBalance = await bullToken.balanceOf(user0.address)
+    const bearBalance = await bearToken.balanceOf(user1.address)
+    expect(bullBalance).eq(expandDecimals(19, 18))
+    expect(bearBalance).eq(expandDecimals(1, 18))
+
+    const totalBalance = bullBalance.add(bearBalance)
+    expect(totalBalance).eq(expandDecimals(20, 18))
+    expect(await bullToken.totalSupply()).eq(expandDecimals(19, 18))
+    expect(await bearToken.totalSupply()).eq(expandDecimals(1, 18))
+
+    await market.rebase()
+
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(19, 18))
+    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(1, 18))
+    expect(await bullToken.totalSupply()).eq(expandDecimals(19, 18))
+    expect(await bearToken.totalSupply()).eq(expandDecimals(1, 18))
+
+    expect(await provider.getBalance(receiver0.address)).eq(0)
+    expect(await provider.getBalance(receiver1.address)).eq(0)
+
+    await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(19, 18), receiver0.address, maxUint256)
+    await router.connect(user1).withdrawETH(bearToken.address, expandDecimals(1, 18), receiver1.address, maxUint256)
+
+    expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(19, 18))
+    expect(await provider.getBalance(receiver1.address)).eq(expandDecimals(1, 18))
 
     expect(await bullToken.balanceOf(user0.address)).eq(0)
     expect(await bearToken.balanceOf(user1.address)).eq(0)

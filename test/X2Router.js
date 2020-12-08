@@ -1,6 +1,6 @@
 const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
-const { loadFixtures, deployContract } = require("./shared/fixtures")
+const { loadFixtures, deployContract, contractAt } = require("./shared/fixtures")
 const { maxUint256, expandDecimals, reportGasUsed, increaseTime, mineBlock } = require("./shared/utilities")
 const { toChainlinkPrice } = require("./shared/chainlink")
 
@@ -13,6 +13,7 @@ describe("X2Router", function () {
   let factory
   let router
   let market
+  let priceFeed
   let bullToken
   let bearToken
   let feeToken
@@ -24,6 +25,7 @@ describe("X2Router", function () {
     factory = fixtures.factory
     router = fixtures.router
     market = fixtures.market
+    priceFeed = fixtures.priceFeed
     bullToken = fixtures.bullToken
     bearToken = fixtures.bearToken
     feeToken = fixtures.feeToken
@@ -86,6 +88,21 @@ describe("X2Router", function () {
   })
 
   it("depositETH", async () => {
+    await factory.createMarket(
+      "X2:3XBULL:ETH/USD",
+      "X2:3XBEAR:ETH/USD",
+      feeToken.address,
+      priceFeed.address,
+      3, // multiplier
+      60 * 60, // unlockDelay of 1 hour
+      9000 // maxProfitBasisPoints, 90%
+    )
+    const marketAddress1 = await factory.markets(1)
+    const market1 = await contractAt("X2Market", marketAddress1)
+    const bullToken1 = await contractAt("X2Token", await market1.bullToken())
+    await expect(router.connect(user0).depositETH(bullToken1.address, maxUint256, { value: 100 }))
+      .to.be.revertedWith("X2Router: mismatched collateral")
+
     const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
     await expect(router.connect(user0).depositETH(token0.address, maxUint256, { value: 100 }))
       .to.be.revertedWith("X2Market: unsupported token")
@@ -268,6 +285,21 @@ describe("X2Router", function () {
   it("withdrawETH", async () => {
     const receiver0 = { address: "0x096b7f612187ca4d608309829fb07faf67ff2364" }
     const receiver1 = { address: "0x42b712f6740cd401f6a9af7ca50f7b67203907ae" }
+
+    await factory.createMarket(
+      "X2:3XBULL:ETH/USD",
+      "X2:3XBEAR:ETH/USD",
+      feeToken.address,
+      priceFeed.address,
+      3, // multiplier
+      60 * 60, // unlockDelay of 1 hour
+      9000 // maxProfitBasisPoints, 90%
+    )
+    const marketAddress1 = await factory.markets(1)
+    const market1 = await contractAt("X2Market", marketAddress1)
+    const bullToken1 = await contractAt("X2Token", await market1.bullToken())
+    await expect(router.connect(user0).withdrawETH(bullToken1.address, 100, receiver0.address, maxUint256))
+      .to.be.revertedWith("X2Router: mismatched collateral")
 
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(0)
