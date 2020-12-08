@@ -29,7 +29,8 @@ async function loadFixtures(provider, wallet) {
     priceFeed.address,
     3, // multiplier
     60 * 60, // unlockDelay of 1 hour
-    9000 // maxProfitBasisPoints, 90%
+    9000, // maxProfitBasisPoints, 90%
+    50 // minDeltaBasisPoints, 0.5%
   )
   // reportGasUsed(provider, tx, "createMarket gas used")
 

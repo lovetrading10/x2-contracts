@@ -12,6 +12,7 @@ import "./interfaces/IX2Factory.sol";
 import "./interfaces/IX2Router.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
+import "hardhat/console.sol";
 
 contract X2Router is IX2Router, ReentrancyGuard {
     using SafeMath for uint256;
@@ -101,6 +102,33 @@ contract X2Router is IX2Router, ReentrancyGuard {
         (bool success,) = _receiver.call{value: withdrawAmount}("");
         require(success, "X2Token: eth transfer failed");
     }
+
+    function withdrawAll(
+        address _token,
+        address _receiver,
+        uint256 _deadline
+    ) external nonReentrant ensureDeadline(_deadline) {
+        address market = _getMarket(_token);
+        uint256 amount = IERC20(_token).balanceOf(msg.sender);
+        _withdraw(market, _token, amount, _receiver);
+    }
+
+    function withdrawAllETH(
+        address _token,
+        address _receiver,
+        uint256 _deadline
+    ) external nonReentrant ensureDeadline(_deadline) {
+        address market = _getMarket(_token);
+        uint256 amount = IERC20(_token).balanceOf(msg.sender);
+        require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
+
+        uint256 withdrawAmount = _withdraw(market, _token, amount, address(this));
+        IWETH(weth).withdraw(withdrawAmount);
+
+        (bool success,) = _receiver.call{value: withdrawAmount}("");
+        require(success, "X2Token: eth transfer failed");
+    }
+
 
     function _transferETHToMarket(address _market, uint256 _amount) private {
         require(IX2Market(_market).collateralToken() == weth, "X2Router: mismatched collateral");

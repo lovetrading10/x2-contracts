@@ -36,6 +36,7 @@ describe("X2Market", function () {
     expect(await market.multiplier()).eq(3)
     expect(await market.unlockDelay()).eq(60 * 60)
     expect(await market.maxProfitBasisPoints()).eq(9000)
+    expect(await market.minDeltaBasisPoints()).eq(50)
   })
 
   it("latestPrice", async () => {
@@ -44,11 +45,24 @@ describe("X2Market", function () {
     await priceFeed.setLatestAnswer(toChainlinkPrice(100))
     expect(await market.latestPrice()).eq(toChainlinkPrice(100))
 
+    // if the price feed returns 0, then the last stored price will be used instead
     await priceFeed.setLatestAnswer(toChainlinkPrice(0))
     expect(await market.latestPrice()).eq(toChainlinkPrice(1000))
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(2000))
     expect(await market.latestPrice()).eq(toChainlinkPrice(2000))
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(10000))
+    expect(await market.latestPrice()).eq(toChainlinkPrice(10000))
+
+    await market.rebase()
+
+    // if the price has not changed by 0.5% then the returned price should not change
+    await priceFeed.setLatestAnswer(toChainlinkPrice(10049))
+    expect(await market.latestPrice()).eq(toChainlinkPrice(10000))
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(10051))
+    expect(await market.latestPrice()).eq(toChainlinkPrice(10051))
   })
 
   it("distributeFees", async () => {

@@ -72,7 +72,8 @@ contract X2Factory is IX2Factory {
         address _priceFeed,
         uint256 _multiplier,
         uint256 _unlockDelay,
-        uint256 _maxProfitBasisPoints
+        uint256 _maxProfitBasisPoints,
+        uint256 _minDeltaBasisPoints
     ) external returns (address, address, address) {
         if (!freeMarketCreation) {
             require(msg.sender == gov, "X2Factory: forbidden");
@@ -85,7 +86,8 @@ contract X2Factory is IX2Factory {
             _priceFeed,
             _multiplier,
             _unlockDelay,
-            _maxProfitBasisPoints
+            _maxProfitBasisPoints,
+            _minDeltaBasisPoints
         );
 
         X2Token bullToken = new X2Token(address(market), router, _bullTokenSymbol);

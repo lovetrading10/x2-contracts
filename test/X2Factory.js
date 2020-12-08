@@ -50,7 +50,8 @@ describe("X2Factory", function () {
       priceFeed.address,
       5, // multiplier
       120 * 60, // unlockDelay of 1 hour
-      8000 // maxProfitBasisPoints, 90%
+      8000, // maxProfitBasisPoints, 80%
+      50 // minDeltaBasisPoints, 0.5%
     )).to.be.revertedWith("X2Factory: forbidden")
 
     await expect(factory.connect(user0).enableFreeMarketCreation())
@@ -67,7 +68,8 @@ describe("X2Factory", function () {
       priceFeed.address,
       5, // multiplier
       120 * 60, // unlockDelay of 1 hour
-      8000 // maxProfitBasisPoints, 90%
+      8000, // maxProfitBasisPoints, 90%
+      50 // minDeltaBasisPoints, 0.5%
     )
 
     expect(await factory.marketsLength()).eq(2)
@@ -81,7 +83,8 @@ describe("X2Factory", function () {
       priceFeed.address,
       5, // multiplier
       120 * 60, // unlockDelay of 1 hour
-      8000 // maxProfitBasisPoints, 90%
+      8000, // maxProfitBasisPoints, 90%
+      50 // minDeltaBasisPoints, 0.5%
     )).to.be.revertedWith("X2Factory: forbidden")
 
     await factory.createMarket(
@@ -91,7 +94,8 @@ describe("X2Factory", function () {
       priceFeed.address,
       5, // multiplier
       120 * 60, // unlockDelay of 2 hours
-      8000 // maxProfitBasisPoints, 90%
+      8000, // maxProfitBasisPoints, 90%
+      50 // minDeltaBasisPoints, 0.5%
     )
     expect(await factory.marketsLength()).eq(2)
 

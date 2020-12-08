@@ -34,6 +34,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public multiplier;
     uint256 public unlockDelay;
     uint256 public maxProfitBasisPoints;
+    uint256 public minDeltaBasisPoints;
     uint256 public lastPrice;
 
     uint256 public feeReserve;
@@ -61,7 +62,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address _priceFeed,
         uint256 _multiplier,
         uint256 _unlockDelay,
-        uint256 _maxProfitBasisPoints
+        uint256 _maxProfitBasisPoints,
+        uint256 _minDeltaBasisPoints
     ) public {
         factory = _factory;
         router = _router;
@@ -70,6 +72,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         multiplier = _multiplier;
         unlockDelay = _unlockDelay;
         maxProfitBasisPoints = _maxProfitBasisPoints;
+        minDeltaBasisPoints = _minDeltaBasisPoints;
 
         lastPrice = latestPrice();
         require(lastPrice != 0, "X2Market: unsupported price feed");
@@ -141,6 +144,13 @@ contract X2Market is IX2Market, ReentrancyGuard {
         uint256 answer = IX2PriceFeed(priceFeed).latestAnswer();
         // prevent zero from being returned
         if (answer == 0) { return lastPrice; }
+
+        // prevent price from moving too often
+        uint256 _lastPrice = lastPrice;
+        uint256 minDelta = _lastPrice.mul(minDeltaBasisPoints).div(BASIS_POINTS_DIVISOR);
+        uint256 delta = answer > _lastPrice ? answer.sub(_lastPrice) : _lastPrice.sub(answer);
+        if (delta <= minDelta) { return _lastPrice; }
+
         return answer;
     }
 
@@ -150,28 +160,29 @@ contract X2Market is IX2Market, ReentrancyGuard {
         uint256 totalBulls = cachedTotalSupply(bullToken);
         uint256 totalBears = cachedTotalSupply(bearToken);
 
+        uint256 _lastPrice = lastPrice;
         uint256 nextPrice = latestPrice();
 
-        if (nextPrice == lastPrice) {
+        if (nextPrice == _lastPrice) {
             return cachedDivisors[_token];
         }
 
         // refSupply is the smaller of the two supplies
         uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
-        uint256 delta = nextPrice > lastPrice ? nextPrice.sub(lastPrice) : lastPrice.sub(nextPrice);
+        uint256 delta = nextPrice > _lastPrice ? nextPrice.sub(_lastPrice) : _lastPrice.sub(nextPrice);
         // profit is [(smaller supply) * (change in price) / (last price)] * multiplier
-        uint256 profit = refSupply.mul(delta).div(lastPrice).mul(multiplier);
+        uint256 profit = refSupply.mul(delta).div(_lastPrice).mul(multiplier);
 
         // cap the profit to the (max profit percentage) of the smaller supply
         uint256 maxProfit = refSupply.mul(maxProfitBasisPoints).div(BASIS_POINTS_DIVISOR);
         if (profit > maxProfit) { profit = maxProfit; }
 
         if (_token == bullToken) {
-            uint256 nextSupply = nextPrice > lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
+            uint256 nextSupply = nextPrice > _lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
             return _getNextDivisor(_token, nextSupply);
         }
 
-        uint256 nextSupply = nextPrice > lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
+        uint256 nextSupply = nextPrice > _lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
         return _getNextDivisor(_token, nextSupply);
     }
 
