@@ -19,6 +19,9 @@ contract X2Market is IX2Market, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
+    // max uint256 has 77 digits, with an initial rebase divisor of 10^20
+    // and assuming 18 decimals for regular tokens, collateral tokens with a supply
+    // of up to 39 digits can be supported
     uint256 public constant INITIAL_REBASE_DIVISOR = 10**20;
 
     address public factory;

@@ -39,9 +39,8 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _amount,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
-        address market = IX2Token(_token).market();
-        address collateralToken = IX2Market(market).collateralToken();
-        IERC20(collateralToken).safeTransferFrom(msg.sender, market, _amount);
+        address market = _getMarket(_token);
+        _transferCollateralToMarket(market, _amount);
         _deposit(market, _token, _amount, 0);
     }
 
@@ -49,11 +48,9 @@ contract X2Router is IX2Router, ReentrancyGuard {
         address _token,
         uint256 _deadline
     ) external payable nonReentrant ensureDeadline(_deadline) {
-        address market = IX2Token(_token).market();
-        uint256 amount = msg.value;
-        IWETH(weth).deposit{value: amount}();
-        require(IWETH(weth).transfer(market, amount), "X2Router: weth transfer failed");
-        _deposit(market, _token, amount, 0);
+        address market = _getMarket(_token);
+        _transferETHToMarket(market, msg.value);
+        _deposit(market, _token, msg.value, 0);
     }
 
     function depositSupportingFeeSubsidy(
@@ -62,9 +59,8 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _subsidy,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
-        address market = IX2Token(_token).market();
-        address collateralToken = IX2Market(market).collateralToken();
-        IERC20(collateralToken).safeTransferFrom(msg.sender, market, _amount);
+        address market = _getMarket(_token);
+        _transferCollateralToMarket(market, _amount);
         _collectFeeToken(market, _subsidy);
         _deposit(market, _token, _amount, _subsidy);
     }
@@ -74,12 +70,10 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _subsidy,
         uint256 _deadline
     ) external payable nonReentrant ensureDeadline(_deadline) {
-        address market = IX2Token(_token).market();
-        uint256 amount = msg.value;
-        IWETH(weth).deposit{value: amount}();
-        require(IWETH(weth).transfer(market, amount), "X2Router: weth transfer failed");
+        address market = _getMarket(_token);
+        _transferETHToMarket(market, msg.value);
         _collectFeeToken(market, _subsidy);
-        _deposit(market, _token, amount, _subsidy);
+        _deposit(market, _token, msg.value, _subsidy);
     }
 
     function withdraw(
@@ -99,10 +93,32 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
         address market = IX2Token(_token).market();
+        require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
+
         uint256 withdrawAmount = _withdraw(market, _token, _amount, address(this));
         IWETH(weth).withdraw(withdrawAmount);
+
         (bool success,) = _receiver.call{value: withdrawAmount}("");
         require(success, "X2Token: eth transfer failed");
+    }
+
+    function _transferETHToMarket(address _market, uint256 _amount) private {
+        require(IX2Market(_market).collateralToken() == weth, "X2Router: mismatched collateral");
+        IWETH(weth).deposit{value: _amount}();
+        require(IWETH(weth).transfer(_market, _amount), "X2Router: weth transfer failed");
+    }
+
+    function _transferCollateralToMarket(address _market, uint256 _amount) private {
+        address collateralToken = IX2Market(_market).collateralToken();
+        uint256 balance = IERC20(collateralToken).balanceOf(_market);
+        IERC20(collateralToken).safeTransferFrom(msg.sender, _market, _amount);
+        require(IERC20(collateralToken).balanceOf(_market).sub(balance) == _amount, "X2Router: token transfer failed");
+    }
+
+    function _getMarket(address _token) private view returns (address) {
+        address market = IX2Token(_token).market();
+        require(IX2Factory(factory).isMarket(market), "X2Router: unsupported market");
+        return market;
     }
 
     function _collectFeeToken(address _market, uint256 _subsidy) private {

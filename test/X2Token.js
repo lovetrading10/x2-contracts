@@ -81,8 +81,10 @@ describe("X2Token", function () {
   })
 
   it("transferFrom", async () => {
+    expect(await bullToken.totalSupply()).eq(0)
     await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 100 })
     expect(await bullToken.balanceOf(user0.address)).eq(100)
+    expect(await bullToken.totalSupply()).eq(100)
 
     await bullToken.connect(user0).approve(user2.address, 60)
 
@@ -103,6 +105,7 @@ describe("X2Token", function () {
     expect(await bullToken.balanceOf(user0.address)).eq(80)
     expect(await bullToken.balanceOf(user1.address)).eq(20)
     expect(await bullToken.allowance(user0.address, user2.address)).eq(40)
+    expect(await bullToken.totalSupply()).eq(100)
 
     await expect(bullToken.connect(user2).transferFrom(user0.address, user1.address, 41))
       .to.be.revertedWith("X2Token: transfer amount exceeds allowance")
@@ -110,5 +113,7 @@ describe("X2Token", function () {
     await bullToken.connect(user2).transferFrom(user0.address, user1.address, 40)
     expect(await bullToken.balanceOf(user0.address)).eq(40)
     expect(await bullToken.balanceOf(user1.address)).eq(60)
+    expect(await bullToken.allowance(user0.address, user2.address)).eq(0)
+    expect(await bullToken.totalSupply()).eq(100)
   })
 })

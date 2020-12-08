@@ -25,6 +25,7 @@ contract X2Factory is IX2Factory {
     bool public freeMarketCreation = false;
 
     mapping (address => uint256) public feeBasisPoints;
+    mapping (address => bool) public override isMarket;
 
     modifier onlyGov() {
         require(msg.sender == gov, "X2Factory: forbidden");
@@ -79,6 +80,7 @@ contract X2Factory is IX2Factory {
         market.setBearToken(address(bearToken));
 
         markets.push(address(market));
+        isMarket[address(market)] = true;
 
         return (address(market), address(bullToken), address(bearToken));
     }
