@@ -1,4 +1,5 @@
 require("@nomiclabs/hardhat-waffle")
+const { KOVAN_URL, KOVAN_DEPLOY_KEY } = require("./env.json")
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -17,6 +18,13 @@ task("accounts", "Prints the list of accounts", async () => {
 * @type import('hardhat/config').HardhatUserConfig
 */
 module.exports = {
+  networks: {
+    hardhat: {},
+    kovan: {
+      url: KOVAN_URL,
+      accounts: [KOVAN_DEPLOY_KEY]
+    }
+  },
   solidity: {
     version: "0.6.12",
     settings: {
