@@ -3,6 +3,9 @@
 pragma solidity 0.6.12;
 
 interface IX2Market {
+    function bullToken() external view returns (address);
+    function bearToken() external view returns (address);
+    function latestPrice() external view returns (uint256);
     function getDivisor(address token) external view returns (uint256);
     function collateralToken() external view returns (address);
     function getNextUnlockTime() external view returns (uint256);

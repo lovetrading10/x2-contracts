@@ -28,8 +28,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     address public router;
 
     address public override collateralToken;
-    address public bullToken;
-    address public bearToken;
+    address public override bullToken;
+    address public override bearToken;
     address public priceFeed;
     uint256 public multiplier;
     uint256 public unlockDelay;
@@ -140,7 +140,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         emit PriceChange(nextPrice);
     }
 
-    function latestPrice() public view returns (uint256) {
+    function latestPrice() public view override returns (uint256) {
         uint256 answer = IX2PriceFeed(priceFeed).latestAnswer();
         // prevent zero from being returned
         if (answer == 0) { return lastPrice; }
