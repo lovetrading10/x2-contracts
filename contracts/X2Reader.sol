@@ -9,16 +9,17 @@ import "./libraries/token/IERC20.sol";
 contract X2Reader {
     using SafeMath for uint256;
 
-    function getMarketInfo(address _market, address _account) public view returns (uint256, uint256, uint256, uint256, uint256) {
+    function getMarketInfo(address _market, address _account) public view returns (uint256, uint256, uint256, uint256, uint256, uint256) {
         address bullToken = IX2Market(_market).bullToken();
         address bearToken = IX2Market(_market).bearToken();
 
         return (
-            IERC20(bullToken).totalSupply(),
-            IERC20(bearToken).totalSupply(),
-            IERC20(bullToken).balanceOf(_account),
-            IERC20(bearToken).balanceOf(_account),
-            IX2Market(_market).latestPrice()
+            _account.balance, // index: 0
+            IX2Market(_market).latestPrice(), // index: 1
+            IERC20(bullToken).totalSupply(), // index: 2
+            IERC20(bearToken).totalSupply(), // index: 3
+            IERC20(bullToken).balanceOf(_account), // index: 4
+            IERC20(bearToken).balanceOf(_account) // index: 5
         );
     }
 }

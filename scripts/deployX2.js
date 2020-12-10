@@ -30,7 +30,9 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
 }
 
 async function main() {
-  const weth = await contractAt("WETH", "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+  // const weth = await contractAt("WETH", "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2") // MAINNET
+  const weth = await contractAt("WETH", "0xd0a1e359811322d97991e03f863a0c30c2cf029c") // KOVAN
+
   const feeToken = await deployContract("X2Fee", [expandDecimals(1000, 18)])
   const feeReceiver = await deployContract("X2FeeReceiver", [])
   const factory = await deployContract("X2Factory", [feeToken.address])
@@ -51,8 +53,8 @@ async function main() {
     minDeltaBasisPoints: 50 // 0.5%
   })
 
-  await factory.setFee(market.address, 20)
-  await factory.setFeeReceiver(feeReceiver.address)
+  await sendTxn(factory.setFee(market.address, 20), "factory.setFee")
+  await sendTxn(factory.setFeeReceiver(feeReceiver.address), "factory.setFeeReceiver")
 
   return { weth, feeToken, feeReceiver, factory, router, priceFeed, market, bullToken, bearToken }
 }

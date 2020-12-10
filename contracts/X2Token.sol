@@ -27,7 +27,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
 
-    mapping (address => uint256) public unlockTimestamps;
+    mapping (address => uint256) public override unlockTimestamps;
 
     modifier onlyRouter() {
         require(msg.sender == router, "X2Token: forbidden");
