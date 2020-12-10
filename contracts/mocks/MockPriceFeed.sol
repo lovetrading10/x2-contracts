@@ -11,6 +11,10 @@ contract MockPriceFeed is IX2PriceFeed {
         return answer;
     }
 
+    function latestTimestamp() public override view returns (uint256) {
+        return block.timestamp;
+    }
+
     function setLatestAnswer(uint256 _answer) public {
         answer = _answer;
     }

@@ -22,7 +22,16 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
   const bullToken = await contractAt("X2Token", await market.bullToken())
   const bearToken = await contractAt("X2Token", await market.bearToken())
 
-  console.info("Deployed market: " + market.address)
+  console.info("Deployed market: " + market.address,
+    bullSymbol,
+    bearSymbol,
+    weth.address,
+    priceFeed.address,
+    multiplier,
+    unlockDelay,
+    maxProfitBasisPoints,
+    minDeltaBasisPoints
+  )
   console.info("  bullToken: " + bullToken.address)
   console.info("  bearToken: " + bearToken.address)
 
