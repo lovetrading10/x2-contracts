@@ -23,8 +23,8 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
   const bearToken = await contractAt("X2Token", await market.bearToken())
 
   console.info("Deployed market: " + market.address,
-    bullSymbol,
-    bearSymbol,
+    factory.address,
+    router.address,
     weth.address,
     priceFeed.address,
     multiplier,
@@ -32,8 +32,8 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
     maxProfitBasisPoints,
     minDeltaBasisPoints
   )
-  console.info("  bullToken: " + bullToken.address)
-  console.info("  bearToken: " + bearToken.address)
+  console.info("  bullToken: " + bullToken.address, bullSymbol)
+  console.info("  bearToken: " + bearToken.address, bearSymbol)
 
   return { market, bullToken, bearToken }
 }
@@ -57,13 +57,13 @@ async function main() {
     weth,
     priceFeed,
     multiplier: 3,
-    unlockDelay: 10 * 60, // 10 minutes
+    unlockDelay: 1 * 60, // 1 minute
     maxProfitBasisPoints: 9000, // 90%
     minDeltaBasisPoints: 50 // 0.5%
   })
 
-  await sendTxn(factory.setFee(market.address, 20), "factory.setFee")
-  await sendTxn(factory.setFeeReceiver(feeReceiver.address), "factory.setFeeReceiver")
+  // await sendTxn(factory.setFee(market.address, 20), "factory.setFee")
+  // await sendTxn(factory.setFeeReceiver(feeReceiver.address), "factory.setFeeReceiver")
 
   return { weth, feeToken, feeReceiver, factory, router, priceFeed, market, bullToken, bearToken }
 }
