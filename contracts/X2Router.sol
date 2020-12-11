@@ -38,43 +38,47 @@ contract X2Router is IX2Router, ReentrancyGuard {
     function deposit(
         address _token,
         uint256 _amount,
+        address _receiver,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferCollateralToMarket(market, _amount);
-        _deposit(market, _token, _amount, 0);
+        _deposit(market, _token, _amount, 0, _receiver);
     }
 
     function depositETH(
         address _token,
+        address _receiver,
         uint256 _deadline
     ) external payable nonReentrant ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferETHToMarket(market, msg.value);
-        _deposit(market, _token, msg.value, 0);
+        _deposit(market, _token, msg.value, 0, _receiver);
     }
 
     function depositSupportingFeeSubsidy(
         address _token,
         uint256 _amount,
         uint256 _subsidy,
+        address _receiver,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferCollateralToMarket(market, _amount);
         _collectFeeToken(market, _subsidy);
-        _deposit(market, _token, _amount, _subsidy);
+        _deposit(market, _token, _amount, _subsidy, _receiver);
     }
 
     function depositETHSupportingFeeSubsidy(
         address _token,
         uint256 _subsidy,
+        address _receiver,
         uint256 _deadline
     ) external payable nonReentrant ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferETHToMarket(market, msg.value);
         _collectFeeToken(market, _subsidy);
-        _deposit(market, _token, msg.value, _subsidy);
+        _deposit(market, _token, msg.value, _subsidy, _receiver);
     }
 
     function withdraw(
@@ -83,6 +87,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
         address _receiver,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
+        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
         address market = _getMarket(_token);
         _withdraw(market, _token, _amount, _receiver);
     }
@@ -93,6 +98,8 @@ contract X2Router is IX2Router, ReentrancyGuard {
         address _receiver,
         uint256 _deadline
     ) external nonReentrant ensureDeadline(_deadline) {
+        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+
         address market = _getMarket(_token);
         require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
 
@@ -110,6 +117,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
     ) external nonReentrant ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
+        IERC20(_token).transferFrom(msg.sender, address(this), amount);
         _withdraw(market, _token, amount, _receiver);
     }
 
@@ -138,9 +146,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
 
     function _transferCollateralToMarket(address _market, uint256 _amount) private {
         address collateralToken = IX2Market(_market).collateralToken();
-        uint256 balance = IERC20(collateralToken).balanceOf(_market);
         IERC20(collateralToken).safeTransferFrom(msg.sender, _market, _amount);
-        require(IERC20(collateralToken).balanceOf(_market).sub(balance) == _amount, "X2Router: token transfer failed");
     }
 
     function _getMarket(address _token) private view returns (address) {
@@ -154,11 +160,11 @@ contract X2Router is IX2Router, ReentrancyGuard {
         IERC20(feeToken).safeTransferFrom(msg.sender, _market, _subsidy);
     }
 
-    function _deposit(address _market, address _token, uint256 _amount, uint256 _feeSubsidy) private returns (uint256) {
-        return IX2Market(_market).deposit(msg.sender, _token, _amount, _feeSubsidy);
+    function _deposit(address _market, address _token, uint256 _amount, uint256 _feeSubsidy, address _receiver) private returns (uint256) {
+        return IX2Market(_market).deposit(_token, _amount, _feeSubsidy, _receiver);
     }
 
     function _withdraw(address _market, address _token, uint256 _amount, address _receiver) private returns (uint256) {
-        return IX2Market(_market).withdraw(msg.sender, _token, _amount, _receiver);
+        return IX2Market(_market).withdraw(_token, _amount, _receiver);
     }
 }

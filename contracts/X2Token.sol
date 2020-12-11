@@ -27,13 +27,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
 
-    mapping (address => uint256) public override unlockTimestamps;
-
-    modifier onlyRouter() {
-        require(msg.sender == router, "X2Token: forbidden");
-        _;
-    }
-
     modifier onlyMarket() {
         require(msg.sender == market, "X2Token: forbidden");
         _;
@@ -87,14 +80,9 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return IX2Market(market).getDivisor(address(this));
     }
 
-    function unlocked(address _account) public view returns (bool) {
-        return block.timestamp > unlockTimestamps[_account];
-    }
-
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
         IX2Market(market).rebase();
 
-        require(unlocked(_sender), "X2Token: account not yet unlocked");
         require(_sender != address(0), "X2Token: transfer from the zero address");
         require(_recipient != address(0), "X2Token: transfer to the zero address");
 
@@ -107,7 +95,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
     function _mint(address _account, uint256 _amount) private {
         require(_account != address(0), "X2Token: mint to the zero address");
-        unlockTimestamps[_account] = IX2Market(market).getNextUnlockTime();
 
         uint256 divisor = getDivisor();
         _increaseBalance(_account, _amount, divisor);
@@ -117,7 +104,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
     function _burn(address _account, uint256 _amount) private {
         require(_account != address(0), "X2Token: burn from the zero address");
-        require(unlocked(_account), "X2Token: account not yet unlocked");
 
         uint256 divisor = getDivisor();
         _decreaseBalance(_account, _amount, divisor);

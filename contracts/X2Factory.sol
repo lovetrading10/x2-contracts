@@ -79,10 +79,12 @@ contract X2Factory is IX2Factory {
             require(msg.sender == gov, "X2Factory: forbidden");
         }
 
-        X2Market market = new X2Market(
+        X2Market market = new X2Market();
+        market.initialize(
             address(this),
             router,
             _collateralToken,
+            feeToken,
             _priceFeed,
             _multiplier,
             _unlockDelay,
