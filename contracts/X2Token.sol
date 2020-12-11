@@ -37,8 +37,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         symbol = _symbol;
     }
 
-    function mint(address _account, uint256 _amount) public override onlyMarket {
-        _mint(_account, _amount);
+    function mint(address _account, uint256 _amount, uint256 _divisor) public override onlyMarket {
+        _mint(_account, _amount, _divisor);
     }
 
     function burn(address _account, uint256 _amount) public override onlyMarket {
@@ -91,11 +91,10 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         emit Transfer(_sender, _recipient, _amount);
     }
 
-    function _mint(address _account, uint256 _amount) private {
+    function _mint(address _account, uint256 _amount, uint256 _divisor) private {
         require(_account != address(0), "X2Token: mint to the zero address");
 
-        uint256 divisor = getDivisor();
-        _increaseBalance(_account, _amount, divisor);
+        _increaseBalance(_account, _amount, _divisor);
 
         emit Transfer(address(0), _account, _amount);
     }
