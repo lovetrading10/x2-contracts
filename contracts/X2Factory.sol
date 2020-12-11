@@ -19,7 +19,6 @@ contract X2Factory is IX2Factory {
     address public gov;
     address public override feeReceiver;
     address public override feeToken;
-    address public router;
 
     address[] public markets;
     bool public freeMarketCreation = false;
@@ -52,11 +51,6 @@ contract X2Factory is IX2Factory {
         gov = msg.sender;
     }
 
-    function setRouter(address _router) external onlyGov {
-        require(router == address(0), "X2Factory: router already set");
-        router = _router;
-    }
-
     function marketsLength() external view returns (uint256) {
         return markets.length;
     }
@@ -82,7 +76,6 @@ contract X2Factory is IX2Factory {
         X2Market market = new X2Market();
         market.initialize(
             address(this),
-            router,
             _collateralToken,
             feeToken,
             _priceFeed,
@@ -92,8 +85,8 @@ contract X2Factory is IX2Factory {
             _minDeltaBasisPoints
         );
 
-        X2Token bullToken = new X2Token(address(market), router, _bullTokenSymbol);
-        X2Token bearToken = new X2Token(address(market), router, _bearTokenSymbol);
+        X2Token bullToken = new X2Token(address(market), _bullTokenSymbol);
+        X2Token bearToken = new X2Token(address(market), _bearTokenSymbol);
 
         market.setBullToken(address(bullToken));
         market.setBearToken(address(bearToken));

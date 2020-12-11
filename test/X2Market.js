@@ -30,7 +30,6 @@ describe("X2Market", function () {
 
   it("inits", async () => {
     expect(await market.factory()).eq(factory.address)
-    expect(await market.router()).eq(router.address)
     expect(await market.collateralToken()).eq(weth.address)
     expect(await market.priceFeed()).eq(priceFeed.address)
     expect(await market.multiplier()).eq(3)

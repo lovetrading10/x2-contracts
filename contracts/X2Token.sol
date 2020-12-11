@@ -22,7 +22,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     uint256 public override _totalSupply;
 
     address public override market;
-    address public router;
 
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
@@ -32,9 +31,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _;
     }
 
-    constructor(address _market, address _router, string memory _symbol) public {
+    constructor(address _market, string memory _symbol) public {
         market = _market;
-        router = _router;
         name = _symbol;
         symbol = _symbol;
     }

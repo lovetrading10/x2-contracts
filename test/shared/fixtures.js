@@ -17,7 +17,6 @@ async function loadFixtures(provider, wallet) {
   const feeReceiver = await deployContract("X2FeeReceiver", [])
   const factory = await deployContract("X2Factory", [feeToken.address])
   const router = await deployContract("X2Router", [factory.address, weth.address])
-  await factory.setRouter(router.address)
 
   const priceFeed = await deployContract("MockPriceFeed", [])
   await priceFeed.setLatestAnswer(toChainlinkPrice(1000))

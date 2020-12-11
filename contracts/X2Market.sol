@@ -9,7 +9,6 @@ import "./libraries/utils/ReentrancyGuard.sol";
 
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Factory.sol";
-import "./interfaces/IX2Router.sol";
 import "./interfaces/IX2FeeReceiver.sol";
 import "./interfaces/IX2PriceFeed.sol";
 import "./interfaces/IX2Token.sol";
@@ -25,7 +24,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
     uint256 public constant INITIAL_REBASE_DIVISOR = 10**20;
 
     address public factory;
-    address public router;
 
     address public override collateralToken;
     address public feeToken;
@@ -59,7 +57,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
     function initialize(
         address _factory,
-        address _router,
         address _collateralToken,
         address _feeToken,
         address _priceFeed,
@@ -72,7 +69,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
         isInitialized = true;
 
         factory = _factory;
-        router = _router;
         collateralToken = _collateralToken;
         feeToken = _feeToken;
         priceFeed = _priceFeed;
