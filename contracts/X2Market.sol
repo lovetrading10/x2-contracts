@@ -106,7 +106,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
         uint256 fee = _collectFees(_amount, _feeSubsidy);
         uint256 depositAmount = _amount.sub(fee);
-        IX2Token(_token).mint(_receiver, depositAmount, getMintDivisor(_token));
+        IX2Token(_token).mint(_receiver, depositAmount, cachedDivisors[_token]);
 
         _updateBalances();
 
@@ -184,17 +184,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
         if (delta <= minDelta) { return _lastPrice; }
 
         return answer;
-    }
-
-    function getMintDivisor(address _token) public view returns (uint256) {
-        uint256 previousDivisor = previousDivisors[_token];
-        uint256 cachedDivisor = cachedDivisors[_token];
-        uint256 rebaseDivisor = getRebaseDivisor(_token);
-        // use the smallest divisor to prevent manipulation
-        if (previousDivisor < cachedDivisor && previousDivisor < rebaseDivisor) {
-            return previousDivisor;
-        }
-        return cachedDivisor < rebaseDivisor ? cachedDivisor : rebaseDivisor;
     }
 
     function getDivisor(address _token) public override view returns (uint256) {
