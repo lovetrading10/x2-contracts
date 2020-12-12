@@ -20,7 +20,6 @@ describe("X2Factory", function () {
     const fixtures = await loadFixtures(provider, wallet)
     weth = fixtures.weth
     factory = fixtures.factory
-    router = fixtures.router
     market = fixtures.market
     priceFeed = fixtures.priceFeed
     feeToken = fixtures.feeToken
@@ -29,12 +28,6 @@ describe("X2Factory", function () {
   it("inits", async () => {
     expect(await factory.feeToken()).eq(feeToken.address)
     expect(await factory.gov()).eq(wallet.address)
-    expect(await factory.router()).eq(router.address)
-  })
-
-  it("setRouter", async () => {
-    await expect(factory.setRouter(user0.address))
-      .to.be.revertedWith("X2Factory: router already set")
   })
 
   it("marketsLength", async () => {
@@ -105,7 +98,6 @@ describe("X2Factory", function () {
     const bearToken = await contractAt("X2Token", await market.bearToken())
 
     expect(await market.factory()).eq(factory.address)
-    expect(await market.router()).eq(router.address)
     expect(await market.collateralToken()).eq(weth.address)
     expect(await market.priceFeed()).eq(priceFeed.address)
     expect(await market.multiplier()).eq(5)
@@ -114,14 +106,30 @@ describe("X2Factory", function () {
     expect(await market.lastPrice()).eq(toChainlinkPrice(1000))
 
     expect(await bullToken.market()).eq(market.address)
-    expect(await bullToken.router()).eq(router.address)
     expect(await bullToken.name()).eq("X2:BULL")
     expect(await bullToken.symbol()).eq("X2:BULL")
 
     expect(await bearToken.market()).eq(market.address)
-    expect(await bearToken.router()).eq(router.address)
     expect(await bearToken.name()).eq("X2:BEAR")
     expect(await bearToken.symbol()).eq("X2:BEAR")
+
+    await expect(market.initialize(
+      factory.address,
+      weth.address,
+      weth.address,
+      feeToken.address,
+      priceFeed.address,
+      5,
+      120 * 60,
+      8000,
+      50
+    )).to.be.revertedWith("X2Market: already initialized")
+
+    await expect(bullToken.initialize(market.address, "X2:BULL"))
+      .to.be.revertedWith("X2Token: already initialized")
+
+    await expect(bearToken.initialize(market.address, "X2:BEAR"))
+      .to.be.revertedWith("X2Token: already initialized")
   })
 
   it("setGov", async () => {
