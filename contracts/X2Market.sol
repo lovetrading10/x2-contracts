@@ -49,6 +49,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     event Fee(uint256 fee, uint256 subsidy);
     event PriceChange(uint256 price);
     event DistributeFees(uint256 fees);
+    event DistributeInterest(uint256 interest);
 
     modifier onlyFactory() {
         require(msg.sender == factory, "X2Market: forbidden");
@@ -95,36 +96,27 @@ contract X2Market is IX2Market, ReentrancyGuard {
         cachedDivisors[bearToken] = INITIAL_REBASE_DIVISOR;
     }
 
-    function deposit(address _token, uint256 _amount, uint256 _feeSubsidy, address _receiver) public override nonReentrant returns (uint256) {
+    function deposit(address _token, address _receiver, bool _withFeeSubsidy) public override nonReentrant returns (uint256) {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
-        require(_getCollateralTokenBalance().sub(collateralTokenBalance) == _amount);
-        if (_feeSubsidy > 0) {
-            require(_getFeeTokenBalance().sub(feeTokenBalance) == _feeSubsidy);
+        uint256 amount = _getCollateralTokenBalance().sub(collateralTokenBalance);
+        uint256 feeSubsidy = 0;
+        if (_withFeeSubsidy) {
+            feeSubsidy = _getFeeTokenBalance().sub(feeTokenBalance);
         }
 
         rebase();
 
-        uint256 fee = _collectFees(_amount, _feeSubsidy);
-        uint256 depositAmount = _amount.sub(fee);
+        uint256 fee = _collectFees(amount, feeSubsidy);
+        uint256 depositAmount = amount.sub(fee);
         IX2Token(_token).mint(_receiver, depositAmount, cachedDivisors[_token]);
 
         _updateBalances();
-
         return depositAmount;
     }
 
     function withdraw(address _token, uint256 _amount, address _receiver) public override nonReentrant returns (uint256) {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
         rebase();
-
-        uint256 divisor = getDivisor(_token);
-        uint256 cachedDivisor = cachedDivisors[_token];
-
-        if (divisor > cachedDivisor) {
-            uint256 scaledAmount = _amount.mul(divisor).div(cachedDivisor);
-            uint256 interest = scaledAmount.sub(_amount);
-            feeReserve = feeReserve.add(interest);
-        }
 
         IX2Token(_token).burn(msg.sender, _amount);
 
@@ -133,7 +125,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 
         _updateBalances();
-
         return withdrawAmount;
     }
 
@@ -145,10 +136,32 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address feeReceiver = IX2Factory(factory).feeReceiver();
         require(feeReceiver != address(0), "X2Market: empty feeReceiver");
 
-        IERC20(collateralToken).safeTransfer(feeReceiver, feeReserve);
-        IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, feeReserve);
-        emit DistributeFees(feeReserve);
+        uint256 totalFees = feeReserve;
         feeReserve = 0;
+
+        IERC20(collateralToken).safeTransfer(feeReceiver, totalFees);
+        IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, totalFees);
+
+        _updateBalances();
+        emit DistributeFees(totalFees);
+    }
+
+    function distributeInterest() public nonReentrant {
+        address feeReceiver = IX2Factory(factory).feeReceiver();
+        require(feeReceiver != address(0), "X2Market: empty feeReceiver");
+
+        uint256 interest = interestReserve();
+        IERC20(collateralToken).safeTransfer(feeReceiver, interest);
+        IX2FeeReceiver(feeReceiver).notifyInterest(collateralToken, interest);
+
+        _updateBalances();
+        emit DistributeInterest(interest);
+    }
+
+    function interestReserve() public view returns (uint256) {
+        uint256 totalBulls = cachedTotalSupply(bullToken);
+        uint256 totalBears = cachedTotalSupply(bearToken);
+        return collateralTokenBalance.sub(totalBulls).sub(totalBears).sub(feeReserve);
     }
 
     function rebase() public override returns (bool) {
@@ -187,6 +200,14 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function getDivisor(address _token) public override view returns (uint256) {
+        uint256 nextPrice = latestPrice();
+
+        if (nextPrice != lastPrice) {
+            uint256 cachedDivisor = cachedDivisors[_token];
+            uint256 rebaseDivisor = getRebaseDivisor(_token);
+            return cachedDivisor > rebaseDivisor ? cachedDivisor : rebaseDivisor;
+        }
+
         uint256 previousDivisor = previousDivisors[_token];
         uint256 cachedDivisor = cachedDivisors[_token];
         uint256 rebaseDivisor = getRebaseDivisor(_token);

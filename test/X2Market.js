@@ -16,6 +16,7 @@ describe("X2Market", function () {
   let market
   let bullToken
   let bearToken
+  let feeReceiver
 
   beforeEach(async () => {
     const fixtures = await loadFixtures(provider, wallet)
@@ -26,6 +27,7 @@ describe("X2Market", function () {
     market = fixtures.market
     bullToken = fixtures.bullToken
     bearToken = fixtures.bearToken
+    feeReceiver = fixtures.feeReceiver
   })
 
   it("inits", async () => {
@@ -36,6 +38,10 @@ describe("X2Market", function () {
     expect(await market.unlockDelay()).eq(60 * 60)
     expect(await market.maxProfitBasisPoints()).eq(9000)
     expect(await market.minDeltaBasisPoints()).eq(50)
+    expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
+    expect(await market.cachedDivisors(bearToken.address)).eq("100000000000000000000")
+    expect(await market.previousDivisors(bullToken.address)).eq("100000000000000000000")
+    expect(await market.previousDivisors(bearToken.address)).eq("100000000000000000000")
   })
 
   it("latestPrice", async () => {
@@ -197,9 +203,10 @@ describe("X2Market", function () {
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
   })
 
-  it("rebase after price increases", async () => {
-    const receiver0 = { address: "0x7a250d5630b4cf539739df2c5dacb4c659f2488d" }
-    const receiver1 = { address: "0x6b06c0ab70549118373f51265f05b1c0fa0873f7" }
+  it("uses a mark price", async () => {
+    const receiver0 = { address: "0x88833a57e9d952b84b3fc8332699f335b767c4b4" }
+    const receiver1 = { address: "0x964724b6e3d1d0fc94a36f918f1386cf7c4dd530" }
+    const receiver2 = { address: "0xf576472aa0f7d40d31a605ead5ac520310f6f22a" }
 
     expect(await bullToken.balanceOf(user0.address)).eq(0)
     expect(await weth.balanceOf(market.address)).eq(0)
@@ -208,107 +215,192 @@ describe("X2Market", function () {
     expect(await bullToken.totalSupply()).eq(0)
     expect(await bearToken.totalSupply()).eq(0)
 
+    await priceFeed.setLatestAnswer(toChainlinkPrice(2000))
+    await market.rebase()
+
+    expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
+    expect(await market.cachedDivisors(bearToken.address)).eq("100000000000000000000")
+    expect(await market.previousDivisors(bullToken.address)).eq("100000000000000000000")
+    expect(await market.previousDivisors(bearToken.address)).eq("100000000000000000000")
+
     await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: expandDecimals(10, 18) })
-    expect(await weth.balanceOf(market.address)).eq(expandDecimals(10, 18))
-
     await router.connect(user1).depositETH(bearToken.address, user1.address, maxUint256, { value: expandDecimals(10, 18) })
-    expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
 
+    await priceFeed.setLatestAnswer(toChainlinkPrice(2200))
+    await market.rebase()
+
+    // bears should pay bulls, but bulls do not get a profit yet
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
-    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
-    expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
-    expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
-    expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
+    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(7, 18))
 
-    await increaseTime(provider, 61 * 60)
-    await mineBlock(provider)
+    await router.connect(user2).depositETH(bullToken.address, user2.address, maxUint256, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user2.address)).eq("7692307692307692307") // ~7.69
 
-    // if a user knows about this incoming price update
-    // the user can make a buy here
-    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
     await market.rebase()
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(7, 18))
+    expect(await bullToken.balanceOf(user2.address)).eq("7692307692307692307") // ~7.69
 
-    let bullBalance = await bullToken.balanceOf(user0.address)
-    let bearBalance = await bearToken.balanceOf(user1.address)
-    // the larger of the divisors are used, so the bear balance decreases
-    // while the bull balance does not increase yet
-    expect(bullBalance).eq(expandDecimals(10, 18))
-    expect(bearBalance).eq(expandDecimals(7, 18))
+    await priceFeed.setLatestAnswer(toChainlinkPrice(2300))
 
-    let totalBalance = bullBalance.add(bearBalance)
-    expect(totalBalance).eq(expandDecimals(17, 18))
-    expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
-    expect(await bearToken.totalSupply()).eq(expandDecimals(7, 18))
-
-    await priceFeed.setLatestAnswer(toChainlinkPrice(1101))
-    await market.rebase()
-
-    bullBalance = await bullToken.balanceOf(user0.address)
-    bearBalance = await bearToken.balanceOf(user1.address)
-    // there should be no change to the bull and bear balances as the price
-    // has not moved by more than 0.5%
-    expect(bullBalance).eq(expandDecimals(10, 18))
-    expect(bearBalance).eq(expandDecimals(7, 18))
-    totalBalance = bullBalance.add(bearBalance)
-    expect(totalBalance).eq(expandDecimals(17, 18))
-    expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
-    expect(await bearToken.totalSupply()).eq(expandDecimals(7, 18))
-
-    await priceFeed.setLatestAnswer(toChainlinkPrice(1210))
-    await market.rebase()
-
-    await priceFeed.setLatestAnswer(toChainlinkPrice(1815))
-    bullBalance = await bullToken.balanceOf(user0.address)
-    bearBalance = await bearToken.balanceOf(user1.address)
-    expect(bullBalance).eq("13000000000000000000")
-    expect(bearBalance).eq("490000000000000000")
-    totalBalance = bullBalance.add(bearBalance)
-    expect(totalBalance).eq("13490000000000000000")
-    expect(await bullToken.totalSupply()).eq("13000000000000000000")
-    expect(await bearToken.totalSupply()).eq("490000000000000000")
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(13, 18))
+    expect(await bearToken.balanceOf(user1.address)).eq("6045454545454545457") // ~6.045
+    expect(await bullToken.balanceOf(user2.address)).eq(expandDecimals(10, 18))
 
     await market.rebase()
 
-    bullBalance = await bullToken.balanceOf(user0.address)
-    bearBalance = await bearToken.balanceOf(user1.address)
-    expect(bullBalance).eq("15100000000000000000")
-    expect(bearBalance).eq("490000000000000000")
-    totalBalance = bullBalance.add(bearBalance)
-    expect(totalBalance).eq("15590000000000000000")
-    expect(await bullToken.totalSupply()).eq("15100000000000000000")
-    expect(await bearToken.totalSupply()).eq("490000000000000000")
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(13, 18))
+    expect(await bearToken.balanceOf(user1.address)).eq("6045454545454545457") // ~6.045
+    expect(await bullToken.balanceOf(user2.address)).eq(expandDecimals(10, 18))
 
-    // expect(await provider.getBalance(receiver0.address)).eq(0)
-    // expect(await provider.getBalance(receiver1.address)).eq(0)
-    //
-    // await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(13, 18), receiver0.address, maxUint256)
-    //
-    // expect(await market.cachedDivisors(bullToken.address)).eq("76923076923076923076")
-    // expect(await market.cachedDivisors(bearToken.address)).eq("142857142857142857142")
-    //
-    // await priceFeed.setLatestAnswer(toChainlinkPrice(2000))
-    // await market.rebase()
-    //
-    // expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
-    // expect(await market.cachedDivisors(bearToken.address)).eq("142857142857142857142")
-    //
-    // await router.connect(user1).withdrawETH(bearToken.address, expandDecimals(7, 18), receiver1.address, maxUint256)
-    //
-    // expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(13, 18))
-    // expect(await provider.getBalance(receiver1.address)).eq(expandDecimals(7, 18))
-    //
-    // expect(await bullToken.balanceOf(user0.address)).eq(0)
-    // expect(await bearToken.balanceOf(user1.address)).eq(0)
-    // expect(await weth.balanceOf(market.address)).eq(0)
-    // expect(await bullToken.totalSupply()).eq(0)
-    // expect(await bearToken.totalSupply()).eq(0)
-    //
-    // await priceFeed.setLatestAnswer(toChainlinkPrice(2200))
-    // await market.rebase()
-    //
-    // expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
-    // expect(await market.cachedDivisors(bearToken.address)).eq("100000000000000000000")
+    expect(await bullToken.totalSupply()).eq("23000000000000000000")
+    expect(await bearToken.totalSupply()).eq("6045454545454545457")
+
+    expect(await market.interestReserve()).eq(0)
+    expect(await provider.getBalance(receiver0.address)).eq(0)
+    await bullToken.connect(user0).approve(router.address, expandDecimals(13, 18))
+    await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(13, 18), receiver0.address, maxUint256)
+    expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(13, 18))
+    expect(await market.interestReserve()).eq("539525691699604742") // 0.539
+
+    expect(await provider.getBalance(receiver1.address)).eq(0)
+    await bearToken.connect(user1).approve(router.address, "6045454545454545457")
+    await router.connect(user1).withdrawETH(bearToken.address, "6045454545454545457", receiver1.address, maxUint256)
+    expect(await provider.getBalance(receiver1.address)).eq("6045454545454545457")
+    expect(await market.interestReserve()).eq("539525691699604742") // 0.539
+
+    expect(await provider.getBalance(receiver2.address)).eq(0)
+    await bullToken.connect(user2).approve(router.address, expandDecimals(10, 18))
+    await router.connect(user2).withdrawETH(bullToken.address, expandDecimals(10, 18), receiver2.address, maxUint256)
+    expect(await provider.getBalance(receiver2.address)).eq(expandDecimals(10, 18))
+    expect(await market.interestReserve()).eq("954545454545454543") // 0.954
+
+    expect(await bullToken.balanceOf(user0.address)).eq(0)
+    expect(await bearToken.balanceOf(user1.address)).eq(0)
+    expect(await bullToken.totalSupply()).eq(0)
+    expect(await bearToken.totalSupply()).eq(0)
+
+    expect(await weth.balanceOf(market.address)).eq("954545454545454543") // 0.954
+
+    await factory.setFeeReceiver(feeReceiver.address)
+    await market.distributeInterest()
+
+    expect(await weth.balanceOf(feeReceiver.address)).eq("954545454545454543") // 0.954
+    expect(await weth.balanceOf(market.address)).eq(0)
   })
+
+  // it("rebase after price increases", async () => {
+  //   const receiver0 = { address: "0x7a250d5630b4cf539739df2c5dacb4c659f2488d" }
+  //   const receiver1 = { address: "0x6b06c0ab70549118373f51265f05b1c0fa0873f7" }
+  //
+  //   expect(await bullToken.balanceOf(user0.address)).eq(0)
+  //   expect(await weth.balanceOf(market.address)).eq(0)
+  //   expect(await bearToken.balanceOf(user1.address)).eq(0)
+  //   expect(await weth.balanceOf(market.address)).eq(0)
+  //   expect(await bullToken.totalSupply()).eq(0)
+  //   expect(await bearToken.totalSupply()).eq(0)
+  //
+  //   await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: expandDecimals(10, 18) })
+  //   expect(await weth.balanceOf(market.address)).eq(expandDecimals(10, 18))
+  //
+  //   await router.connect(user1).depositETH(bearToken.address, user1.address, maxUint256, { value: expandDecimals(10, 18) })
+  //   expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
+  //
+  //   expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+  //   expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
+  //   expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
+  //   expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+  //   expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
+  //
+  //   await increaseTime(provider, 61 * 60)
+  //   await mineBlock(provider)
+  //
+  //   // if a user knows about this incoming price update
+  //   // the user can make a buy here
+  //   await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+  //   await market.rebase()
+  //
+  //   let bullBalance = await bullToken.balanceOf(user0.address)
+  //   let bearBalance = await bearToken.balanceOf(user1.address)
+  //   // the larger of the divisors are used, so the bear balance decreases
+  //   // while the bull balance does not increase yet
+  //   expect(bullBalance).eq(expandDecimals(10, 18))
+  //   expect(bearBalance).eq(expandDecimals(7, 18))
+  //
+  //   let totalBalance = bullBalance.add(bearBalance)
+  //   expect(totalBalance).eq(expandDecimals(17, 18))
+  //   expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+  //   expect(await bearToken.totalSupply()).eq(expandDecimals(7, 18))
+  //
+  //   await priceFeed.setLatestAnswer(toChainlinkPrice(1101))
+  //   await market.rebase()
+  //
+  //   bullBalance = await bullToken.balanceOf(user0.address)
+  //   bearBalance = await bearToken.balanceOf(user1.address)
+  //   // there should be no change to the bull and bear balances as the price
+  //   // has not moved by more than 0.5%
+  //   expect(bullBalance).eq(expandDecimals(10, 18))
+  //   expect(bearBalance).eq(expandDecimals(7, 18))
+  //   totalBalance = bullBalance.add(bearBalance)
+  //   expect(totalBalance).eq(expandDecimals(17, 18))
+  //   expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+  //   expect(await bearToken.totalSupply()).eq(expandDecimals(7, 18))
+  //
+  //   await priceFeed.setLatestAnswer(toChainlinkPrice(1210))
+  //   await market.rebase()
+  //
+  //   await priceFeed.setLatestAnswer(toChainlinkPrice(1815))
+  //   bullBalance = await bullToken.balanceOf(user0.address)
+  //   bearBalance = await bearToken.balanceOf(user1.address)
+  //   expect(bullBalance).eq("13000000000000000000")
+  //   expect(bearBalance).eq("490000000000000000")
+  //   totalBalance = bullBalance.add(bearBalance)
+  //   expect(totalBalance).eq("13490000000000000000")
+  //   expect(await bullToken.totalSupply()).eq("13000000000000000000")
+  //   expect(await bearToken.totalSupply()).eq("490000000000000000")
+  //
+  //   await market.rebase()
+  //
+  //   bullBalance = await bullToken.balanceOf(user0.address)
+  //   bearBalance = await bearToken.balanceOf(user1.address)
+  //   expect(bullBalance).eq("15100000000000000000")
+  //   expect(bearBalance).eq("490000000000000000")
+  //   totalBalance = bullBalance.add(bearBalance)
+  //   expect(totalBalance).eq("15590000000000000000")
+  //   expect(await bullToken.totalSupply()).eq("15100000000000000000")
+  //   expect(await bearToken.totalSupply()).eq("490000000000000000")
+  //
+  //   // expect(await provider.getBalance(receiver0.address)).eq(0)
+  //   // expect(await provider.getBalance(receiver1.address)).eq(0)
+  //   //
+  //   // await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(13, 18), receiver0.address, maxUint256)
+  //   //
+  //   // expect(await market.cachedDivisors(bullToken.address)).eq("76923076923076923076")
+  //   // expect(await market.cachedDivisors(bearToken.address)).eq("142857142857142857142")
+  //   //
+  //   // await priceFeed.setLatestAnswer(toChainlinkPrice(2000))
+  //   // await market.rebase()
+  //   //
+  //   // expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
+  //   // expect(await market.cachedDivisors(bearToken.address)).eq("142857142857142857142")
+  //   //
+  //   // await router.connect(user1).withdrawETH(bearToken.address, expandDecimals(7, 18), receiver1.address, maxUint256)
+  //   //
+  //   // expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(13, 18))
+  //   // expect(await provider.getBalance(receiver1.address)).eq(expandDecimals(7, 18))
+  //   //
+  //   // expect(await bullToken.balanceOf(user0.address)).eq(0)
+  //   // expect(await bearToken.balanceOf(user1.address)).eq(0)
+  //   // expect(await weth.balanceOf(market.address)).eq(0)
+  //   // expect(await bullToken.totalSupply()).eq(0)
+  //   // expect(await bearToken.totalSupply()).eq(0)
+  //   //
+  //   // await priceFeed.setLatestAnswer(toChainlinkPrice(2200))
+  //   // await market.rebase()
+  //   //
+  //   // expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
+  //   // expect(await market.cachedDivisors(bearToken.address)).eq("100000000000000000000")
+  // })
 
   // it("rebase when profit exceeds max profit", async () => {
   //   const receiver0 = { address: "0xba58ac30a55bcf22042dcaa5a0b3fed51a2c9617" }

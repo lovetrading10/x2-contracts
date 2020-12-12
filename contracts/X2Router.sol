@@ -5,16 +5,14 @@ pragma solidity 0.6.12;
 import "./libraries/token/IERC20.sol";
 import "./libraries/token/SafeERC20.sol";
 import "./libraries/math/SafeMath.sol";
-import "./libraries/utils/ReentrancyGuard.sol";
 
 import "./interfaces/IWETH.sol";
 import "./interfaces/IX2Factory.sol";
 import "./interfaces/IX2Router.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
-import "hardhat/console.sol";
 
-contract X2Router is IX2Router, ReentrancyGuard {
+contract X2Router is IX2Router {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -40,20 +38,20 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _amount,
         address _receiver,
         uint256 _deadline
-    ) external nonReentrant ensureDeadline(_deadline) {
+    ) external ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferCollateralToMarket(market, _amount);
-        _deposit(market, _token, _amount, 0, _receiver);
+        _deposit(market, _token, _receiver, false);
     }
 
     function depositETH(
         address _token,
         address _receiver,
         uint256 _deadline
-    ) external payable nonReentrant ensureDeadline(_deadline) {
+    ) external payable ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferETHToMarket(market, msg.value);
-        _deposit(market, _token, msg.value, 0, _receiver);
+        _deposit(market, _token, _receiver, false);
     }
 
     function depositSupportingFeeSubsidy(
@@ -62,11 +60,11 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _subsidy,
         address _receiver,
         uint256 _deadline
-    ) external nonReentrant ensureDeadline(_deadline) {
+    ) external ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferCollateralToMarket(market, _amount);
-        _collectFeeToken(market, _subsidy);
-        _deposit(market, _token, _amount, _subsidy, _receiver);
+        _transferFeeTokenToMarket(market, _subsidy);
+        _deposit(market, _token, _receiver, true);
     }
 
     function depositETHSupportingFeeSubsidy(
@@ -74,11 +72,11 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _subsidy,
         address _receiver,
         uint256 _deadline
-    ) external payable nonReentrant ensureDeadline(_deadline) {
+    ) external payable ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         _transferETHToMarket(market, msg.value);
-        _collectFeeToken(market, _subsidy);
-        _deposit(market, _token, msg.value, _subsidy, _receiver);
+        _transferFeeTokenToMarket(market, _subsidy);
+        _deposit(market, _token, _receiver, true);
     }
 
     function withdraw(
@@ -86,7 +84,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _amount,
         address _receiver,
         uint256 _deadline
-    ) external nonReentrant ensureDeadline(_deadline) {
+    ) external ensureDeadline(_deadline) {
         IERC20(_token).transferFrom(msg.sender, address(this), _amount);
         address market = _getMarket(_token);
         _withdraw(market, _token, _amount, _receiver);
@@ -97,7 +95,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
         uint256 _amount,
         address _receiver,
         uint256 _deadline
-    ) external nonReentrant ensureDeadline(_deadline) {
+    ) external ensureDeadline(_deadline) {
         IERC20(_token).transferFrom(msg.sender, address(this), _amount);
 
         address market = _getMarket(_token);
@@ -114,7 +112,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
         address _token,
         address _receiver,
         uint256 _deadline
-    ) external nonReentrant ensureDeadline(_deadline) {
+    ) external ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
         IERC20(_token).transferFrom(msg.sender, address(this), amount);
@@ -125,7 +123,7 @@ contract X2Router is IX2Router, ReentrancyGuard {
         address _token,
         address _receiver,
         uint256 _deadline
-    ) external nonReentrant ensureDeadline(_deadline) {
+    ) external ensureDeadline(_deadline) {
         address market = _getMarket(_token);
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
         require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
@@ -155,13 +153,13 @@ contract X2Router is IX2Router, ReentrancyGuard {
         return market;
     }
 
-    function _collectFeeToken(address _market, uint256 _subsidy) private {
+    function _transferFeeTokenToMarket(address _market, uint256 _subsidy) private {
         address feeToken = IX2Factory(factory).feeToken();
         IERC20(feeToken).safeTransferFrom(msg.sender, _market, _subsidy);
     }
 
-    function _deposit(address _market, address _token, uint256 _amount, uint256 _feeSubsidy, address _receiver) private returns (uint256) {
-        return IX2Market(_market).deposit(_token, _amount, _feeSubsidy, _receiver);
+    function _deposit(address _market, address _token, address _receiver, bool _withFeeSubsidy) private returns (uint256) {
+        return IX2Market(_market).deposit(_token, _receiver, _withFeeSubsidy);
     }
 
     function _withdraw(address _market, address _token, uint256 _amount, address _receiver) private returns (uint256) {

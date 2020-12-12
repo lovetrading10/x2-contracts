@@ -12,4 +12,5 @@ contract X2FeeReceiver is IX2FeeReceiver {
     using SafeERC20 for IERC20;
 
     function notifyFees(address token, uint256 balance) public override {}
+    function notifyInterest(address token, uint256 balance) public override {}
 }
