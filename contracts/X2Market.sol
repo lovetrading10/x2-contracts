@@ -19,12 +19,13 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
     // max uint256 has 77 digits, with an initial rebase divisor of 10^20
-    // and assuming 18 decimals for regular tokens, collateral tokens with a supply
+    // and assuming 18 decimals for tokens, collateral tokens with a supply
     // of up to 39 digits can be supported
     uint256 public constant INITIAL_REBASE_DIVISOR = 10**20;
 
     address public factory;
 
+    address public weth;
     address public override collateralToken;
     address public feeToken;
     address public override bullToken;
@@ -58,6 +59,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
     function initialize(
         address _factory,
+        address _weth,
         address _collateralToken,
         address _feeToken,
         address _priceFeed,
@@ -70,6 +72,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         isInitialized = true;
 
         factory = _factory;
+        weth = _weth;
         collateralToken = _collateralToken;
         feeToken = _feeToken;
         priceFeed = _priceFeed;
@@ -100,7 +103,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
         uint256 amount = _getCollateralTokenBalance().sub(collateralTokenBalance);
         uint256 feeSubsidy = 0;
-        if (_withFeeSubsidy) {
+        if (_withFeeSubsidy && collateralToken == weth) {
             feeSubsidy = _getFeeTokenBalance().sub(feeTokenBalance);
         }
 
@@ -110,7 +113,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         uint256 depositAmount = amount.sub(fee);
         IX2Token(_token).mint(_receiver, depositAmount, cachedDivisors[_token]);
 
-        _updateBalances();
+        _updateCollateralTokenBalance();
+        _updateFeeTokenBalance();
         return depositAmount;
     }
 
@@ -124,26 +128,22 @@ contract X2Market is IX2Market, ReentrancyGuard {
         uint256 withdrawAmount = _amount.sub(fee);
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 
-        _updateBalances();
+        _updateCollateralTokenBalance();
         return withdrawAmount;
-    }
-
-    function getNextUnlockTime() public override view returns (uint256) {
-        return block.timestamp.add(unlockDelay);
     }
 
     function distributeFees() public nonReentrant {
         address feeReceiver = IX2Factory(factory).feeReceiver();
         require(feeReceiver != address(0), "X2Market: empty feeReceiver");
 
-        uint256 totalFees = feeReserve;
+        uint256 fees = feeReserve;
         feeReserve = 0;
 
-        IERC20(collateralToken).safeTransfer(feeReceiver, totalFees);
-        IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, totalFees);
+        IERC20(collateralToken).safeTransfer(feeReceiver, fees);
+        IX2FeeReceiver(feeReceiver).notifyFees(collateralToken, fees);
 
-        _updateBalances();
-        emit DistributeFees(totalFees);
+        _updateCollateralTokenBalance();
+        emit DistributeFees(fees);
     }
 
     function distributeInterest() public nonReentrant {
@@ -154,7 +154,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         IERC20(collateralToken).safeTransfer(feeReceiver, interest);
         IX2FeeReceiver(feeReceiver).notifyInterest(collateralToken, interest);
 
-        _updateBalances();
+        _updateCollateralTokenBalance();
         emit DistributeInterest(interest);
     }
 
@@ -202,16 +202,21 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function getDivisor(address _token) public override view returns (uint256) {
         uint256 nextPrice = latestPrice();
 
+        // if the price has moved then on rebase the previousDivisor
+        // will have the current cachedDivisor's value
+        // and the cachedDivisor will have the rebaseDivisor's value
+        // so we should only compare these two values for this case
         if (nextPrice != lastPrice) {
             uint256 cachedDivisor = cachedDivisors[_token];
             uint256 rebaseDivisor = getRebaseDivisor(_token);
+            // return the largest divisor to prevent manipulation
             return cachedDivisor > rebaseDivisor ? cachedDivisor : rebaseDivisor;
         }
 
         uint256 previousDivisor = previousDivisors[_token];
         uint256 cachedDivisor = cachedDivisors[_token];
         uint256 rebaseDivisor = getRebaseDivisor(_token);
-        // use the largest divisor to prevent manipulation
+        // return the largest divisor to prevent manipulation
         if (previousDivisor > cachedDivisor && previousDivisor > rebaseDivisor) {
             return previousDivisor;
         }
@@ -219,10 +224,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function getRebaseDivisor(address _token) public view returns (uint256) {
-        require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
-
-        uint256 totalBulls = cachedTotalSupply(bullToken);
-        uint256 totalBears = cachedTotalSupply(bearToken);
+        address _bullToken = bullToken;
+        address _bearToken = bearToken;
 
         uint256 _lastPrice = lastPrice;
         uint256 nextPrice = latestPrice();
@@ -230,6 +233,9 @@ contract X2Market is IX2Market, ReentrancyGuard {
         if (nextPrice == _lastPrice) {
             return cachedDivisors[_token];
         }
+
+        uint256 totalBulls = cachedTotalSupply(_bullToken);
+        uint256 totalBears = cachedTotalSupply(_bearToken);
 
         // refSupply is the smaller of the two supplies
         uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
@@ -241,7 +247,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         uint256 maxProfit = refSupply.mul(maxProfitBasisPoints).div(BASIS_POINTS_DIVISOR);
         if (profit > maxProfit) { profit = maxProfit; }
 
-        if (_token == bullToken) {
+        if (_token == _bullToken) {
             uint256 nextSupply = nextPrice > _lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
             return _getNextDivisor(_token, nextSupply);
         }
@@ -278,8 +284,11 @@ contract X2Market is IX2Market, ReentrancyGuard {
         return fee;
     }
 
-    function _updateBalances() private {
+    function _updateFeeTokenBalance() private {
         feeTokenBalance = _getFeeTokenBalance();
+    }
+
+    function _updateCollateralTokenBalance() private {
         collateralTokenBalance = _getCollateralTokenBalance();
     }
 

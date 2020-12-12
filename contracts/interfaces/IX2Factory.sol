@@ -6,5 +6,4 @@ interface IX2Factory {
     function feeToken() external view returns (address);
     function feeReceiver() external view returns (address);
     function getFee(address market, uint256 amount) external view returns (uint256);
-    function isMarket(address market) external view returns (bool);
 }

@@ -26,12 +26,16 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
 
+    bool public isInitialized;
+
     modifier onlyMarket() {
         require(msg.sender == market, "X2Token: forbidden");
         _;
     }
 
-    constructor(address _market, string memory _symbol) public {
+    function initialize(address _market, string memory _symbol) public {
+        require(!isInitialized, "X2Token: already initialized");
+        isInitialized = true;
         market = _market;
         name = _symbol;
         symbol = _symbol;

@@ -15,7 +15,7 @@ async function loadFixtures(provider, wallet) {
   const weth = await deployContract("WETH", [])
   const feeToken = await deployContract("X2Fee", [expandDecimals(1000, 18)])
   const feeReceiver = await deployContract("X2FeeReceiver", [])
-  const factory = await deployContract("X2Factory", [feeToken.address])
+  const factory = await deployContract("X2Factory", [feeToken.address, weth.address])
   const router = await deployContract("X2Router", [factory.address, weth.address])
 
   const priceFeed = await deployContract("MockPriceFeed", [])

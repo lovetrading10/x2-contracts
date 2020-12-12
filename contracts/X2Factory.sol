@@ -19,12 +19,12 @@ contract X2Factory is IX2Factory {
     address public gov;
     address public override feeReceiver;
     address public override feeToken;
+    address public weth;
 
     address[] public markets;
     bool public freeMarketCreation = false;
 
     mapping (address => uint256) public feeBasisPoints;
-    mapping (address => bool) public override isMarket;
 
     event CreateMarket(
         string bullToken,
@@ -46,8 +46,9 @@ contract X2Factory is IX2Factory {
         _;
     }
 
-    constructor(address _feeToken) public {
+    constructor(address _feeToken, address _weth) public {
         feeToken = _feeToken;
+        weth = _weth;
         gov = msg.sender;
     }
 
@@ -76,6 +77,7 @@ contract X2Factory is IX2Factory {
         X2Market market = new X2Market();
         market.initialize(
             address(this),
+            weth,
             _collateralToken,
             feeToken,
             _priceFeed,
@@ -85,14 +87,16 @@ contract X2Factory is IX2Factory {
             _minDeltaBasisPoints
         );
 
-        X2Token bullToken = new X2Token(address(market), _bullTokenSymbol);
-        X2Token bearToken = new X2Token(address(market), _bearTokenSymbol);
+        X2Token bullToken = new X2Token();
+        bullToken.initialize(address(market), _bullTokenSymbol);
+
+        X2Token bearToken = new X2Token();
+        bearToken.initialize(address(market), _bearTokenSymbol);
 
         market.setBullToken(address(bullToken));
         market.setBearToken(address(bearToken));
 
         markets.push(address(market));
-        isMarket[address(market)] = true;
 
         emit CreateMarket(
             _bullTokenSymbol,
