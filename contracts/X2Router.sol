@@ -128,6 +128,7 @@ contract X2Router is IX2Router {
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
         require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
 
+        IERC20(_token).transferFrom(msg.sender, address(this), amount);
         uint256 withdrawAmount = IX2Market(market).withdraw(_token, amount, address(this));
         IWETH(weth).withdraw(withdrawAmount);
 

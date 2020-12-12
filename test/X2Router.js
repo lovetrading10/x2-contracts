@@ -1,7 +1,7 @@
 const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
 const { loadFixtures, deployContract, contractAt } = require("./shared/fixtures")
-const { maxUint256, expandDecimals, reportGasUsed, increaseTime, mineBlock } = require("./shared/utilities")
+const { maxUint256, expandDecimals, reportGasUsed } = require("./shared/utilities")
 const { toChainlinkPrice } = require("./shared/chainlink")
 
 use(solidity)
@@ -38,19 +38,16 @@ describe("X2Router", function () {
   })
 
   it("deposit", async () => {
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
+    const token0 = await deployContract("X2Token", [])
+    await token0.initialize(market.address, "X2:BULL")
     await weth.connect(user0).deposit({ value: 100 })
     await weth.connect(user0).approve(router.address, 100)
-    await expect(router.connect(user0).deposit(token0.address, 100, maxUint256))
+    await expect(router.connect(user0).deposit(token0.address, 100, user0.address, maxUint256))
       .to.be.revertedWith("X2Market: unsupported token")
-
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).deposit(token1.address, 100, maxUint256))
-      .to.be.revertedWith("X2Router: unsupported market")
 
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(100)
-    await router.connect(user0).deposit(bullToken.address, 100, maxUint256)
+    await router.connect(user0).deposit(bullToken.address, 100, user0.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(100)
     expect(await weth.balanceOf(user0.address)).eq(0)
 
@@ -64,10 +61,10 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(user1.address)).eq(2000)
     expect(await bullToken.balanceOf(user1.address)).eq(0)
     expect(await market.feeReserve()).eq(0)
-    await router.connect(user1).deposit(bullToken.address, 2000, maxUint256)
+    await router.connect(user1).deposit(bullToken.address, 2000, user2.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(2100)
     expect(await weth.balanceOf(user0.address)).eq(0)
-    expect(await bullToken.balanceOf(user1.address)).eq(1996) // 2000 - 4
+    expect(await bullToken.balanceOf(user2.address)).eq(1996) // 2000 - 4
     expect(await market.feeReserve()).eq(4)
 
     expect(await weth.balanceOf(feeReceiver.address)).eq(0)
@@ -101,19 +98,16 @@ describe("X2Router", function () {
     const marketAddress1 = await factory.markets(1)
     const market1 = await contractAt("X2Market", marketAddress1)
     const bullToken1 = await contractAt("X2Token", await market1.bullToken())
-    await expect(router.connect(user0).depositETH(bullToken1.address, maxUint256, { value: 100 }))
+    await expect(router.connect(user0).depositETH(bullToken1.address, user0.address, maxUint256, { value: 100 }))
       .to.be.revertedWith("X2Router: mismatched collateral")
 
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).depositETH(token0.address, maxUint256, { value: 100 }))
+    const token0 = await deployContract("X2Token", [])
+    token0.initialize(market.address, "X2:BULL")
+    await expect(router.connect(user0).depositETH(token0.address, user0.address, maxUint256, { value: 100 }))
       .to.be.revertedWith("X2Market: unsupported token")
 
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).depositETH(token1.address, maxUint256, { value: 100 }))
-      .to.be.revertedWith("X2Router: unsupported market")
-
     expect(await weth.balanceOf(market.address)).eq(0)
-    await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 100 })
+    await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: 100 })
     expect(await weth.balanceOf(market.address)).eq(100)
     expect(await weth.balanceOf(user0.address)).eq(0)
 
@@ -124,10 +118,10 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(user1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(0)
     expect(await market.feeReserve()).eq(0)
-    await router.connect(user1).depositETH(bullToken.address, maxUint256, { value: 2000 })
+    await router.connect(user1).depositETH(bullToken.address, user2.address, maxUint256, { value: 2000 })
     expect(await weth.balanceOf(market.address)).eq(2100)
     expect(await weth.balanceOf(user0.address)).eq(0)
-    expect(await bullToken.balanceOf(user1.address)).eq(1996) // 2000 - 4
+    expect(await bullToken.balanceOf(user2.address)).eq(1996) // 2000 - 4
     expect(await market.feeReserve()).eq(4)
 
     expect(await weth.balanceOf(feeReceiver.address)).eq(0)
@@ -145,24 +139,21 @@ describe("X2Router", function () {
     await feeToken.transfer(user0.address, 1)
     await feeToken.connect(user0).approve(router.address, 1)
 
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
+    const token0 = await deployContract("X2Token", [])
+    token0.initialize(market.address, "X2:BULL")
     await weth.connect(user0).deposit({ value: 2000 })
     await weth.connect(user0).approve(router.address, 2000)
-    await expect(router.connect(user0).depositSupportingFeeSubsidy(token0.address, 2000, 1, maxUint256))
+    await expect(router.connect(user0).depositSupportingFeeSubsidy(token0.address, 2000, 1, user0.address, maxUint256))
       .to.be.revertedWith("X2Market: unsupported token")
-
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).depositSupportingFeeSubsidy(token1.address, 2000, 1, maxUint256))
-      .to.be.revertedWith("X2Router: unsupported market")
 
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(2000)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
     expect(await feeToken.balanceOf(market.address)).eq(0)
-    await router.connect(user0).depositSupportingFeeSubsidy(bullToken.address, 2000, 1, maxUint256)
+    await router.connect(user0).depositSupportingFeeSubsidy(bullToken.address, 2000, 1, user1.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await weth.balanceOf(user0.address)).eq(0)
-    expect(await bullToken.balanceOf(user0.address)).eq(1997)
+    expect(await bullToken.balanceOf(user1.address)).eq(1997)
     expect(await feeToken.balanceOf(market.address)).eq(1)
 
     expect(await weth.balanceOf(feeReceiver.address)).eq(0)
@@ -180,19 +171,16 @@ describe("X2Router", function () {
     await feeToken.transfer(user0.address, 1)
     await feeToken.connect(user0).approve(router.address, 1)
 
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).depositETHSupportingFeeSubsidy(token0.address, 1, maxUint256, { value: 2000 }))
+    const token0 = await deployContract("X2Token", [])
+    token0.initialize(market.address, "X2:BULL")
+    await expect(router.connect(user0).depositETHSupportingFeeSubsidy(token0.address, 1, user0.address, maxUint256, { value: 2000 }))
       .to.be.revertedWith("X2Market: unsupported token")
-
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).depositETHSupportingFeeSubsidy(token1.address, 1, maxUint256, { value: 2000 }))
-      .to.be.revertedWith("X2Router: unsupported market")
 
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
     expect(await feeToken.balanceOf(market.address)).eq(0)
-    await router.connect(user0).depositETHSupportingFeeSubsidy(bullToken.address, 1, maxUint256, { value: 2000 })
+    await router.connect(user0).depositETHSupportingFeeSubsidy(bullToken.address, 1, user0.address, maxUint256, { value: 2000 })
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(1997)
@@ -214,31 +202,18 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
-    await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 2000 })
+    await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: 2000 })
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(2000)
 
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
+    const token0 = await deployContract("X2Token", [])
+    await token0.initialize(market.address, "X2:BULL")
+    await token0.connect(user0).approve(router.address, 100)
     await expect(router.connect(user0).withdraw(token0.address, 100, receiver0.address, maxUint256))
       .to.be.revertedWith("X2Market: unsupported token")
 
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).withdraw(token1.address, 100, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Router: unsupported market")
-
-    await expect(router.connect(user0).withdraw(bullToken.address, 2000, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user0).withdraw(bullToken.address, 2000, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
-
+    await bullToken.connect(user0).approve(router.address, 2000)
     await router.connect(user0).withdraw(bullToken.address, 2000, receiver0.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(receiver0.address)).eq(2000)
@@ -247,7 +222,7 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(0)
-    await router.connect(user1).depositETH(bullToken.address, maxUint256, { value: 5000 })
+    await router.connect(user1).depositETH(bullToken.address, user1.address, maxUint256, { value: 5000 })
     expect(await weth.balanceOf(market.address)).eq(5000)
     expect(await weth.balanceOf(user1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(5000)
@@ -255,19 +230,8 @@ describe("X2Router", function () {
     await factory.setFee(market.address, 20)
     await factory.setFeeReceiver(feeReceiver.address)
 
-    await expect(router.connect(user1).withdraw(bullToken.address, 5000, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user1).withdraw(bullToken.address, 5000, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
-
     expect(await market.feeReserve()).eq(0)
+    await bullToken.connect(user1).approve(router.address, 5000)
     await router.connect(user1).withdraw(bullToken.address, 5000, receiver1.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(10)
     expect(await weth.balanceOf(receiver1.address)).eq(4990) // 5000 - 10
@@ -297,39 +261,15 @@ describe("X2Router", function () {
       9000, // maxProfitBasisPoints, 90%
       50 // minDeltaBasisPoints, 0.5%
     )
-    const marketAddress1 = await factory.markets(1)
-    const market1 = await contractAt("X2Market", marketAddress1)
-    const bullToken1 = await contractAt("X2Token", await market1.bullToken())
-    await expect(router.connect(user0).withdrawETH(bullToken1.address, 100, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Router: mismatched collateral")
 
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
-    await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 2000 })
+    await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: 2000 })
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await bullToken.balanceOf(user0.address)).eq(2000)
 
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).withdrawETH(token0.address, 100, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Market: unsupported token")
-
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).withdrawETH(token1.address, 100, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Router: unsupported market")
-
-    await expect(router.connect(user0).withdrawETH(bullToken.address, 2000, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user0).withdrawETH(bullToken.address, 2000, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
-
+    await bullToken.connect(user0).approve(router.address, 2000)
     await router.connect(user0).withdrawETH(bullToken.address, 2000, receiver0.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await provider.getBalance(receiver0.address)).eq(2000)
@@ -338,25 +278,14 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(0)
-    await router.connect(user1).depositETH(bullToken.address, maxUint256, { value: 5000 })
+    await bullToken.connect(user1).approve(router.address, 5000)
+    await router.connect(user1).depositETH(bullToken.address, user1.address, maxUint256, { value: 5000 })
     expect(await weth.balanceOf(market.address)).eq(5000)
     expect(await provider.getBalance(receiver1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(5000)
 
     await factory.setFee(market.address, 20)
     await factory.setFeeReceiver(feeReceiver.address)
-
-    await expect(router.connect(user1).withdrawETH(bullToken.address, 5000, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user1).withdrawETH(bullToken.address, 5000, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
 
     expect(await market.feeReserve()).eq(0)
     await router.connect(user1).withdrawETH(bullToken.address, 5000, receiver1.address, maxUint256)
@@ -381,31 +310,12 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
-    await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 2000 })
+    await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: 2000 })
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(2000)
 
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).withdrawAll(token0.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Market: unsupported token")
-
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).withdrawAll(token1.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Router: unsupported market")
-
-    await expect(router.connect(user0).withdrawAll(bullToken.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user0).withdrawAll(bullToken.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
-
+    await bullToken.connect(user0).approve(router.address, 2000)
     await router.connect(user0).withdrawAll(bullToken.address, receiver0.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(receiver0.address)).eq(2000)
@@ -414,7 +324,7 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(0)
-    await router.connect(user1).depositETH(bullToken.address, maxUint256, { value: 5000 })
+    await router.connect(user1).depositETH(bullToken.address, user1.address, maxUint256, { value: 5000 })
     expect(await weth.balanceOf(market.address)).eq(5000)
     expect(await weth.balanceOf(user1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(5000)
@@ -422,19 +332,8 @@ describe("X2Router", function () {
     await factory.setFee(market.address, 20)
     await factory.setFeeReceiver(feeReceiver.address)
 
-    await expect(router.connect(user1).withdrawAll(bullToken.address, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user1).withdrawAll(bullToken.address, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
-
     expect(await market.feeReserve()).eq(0)
+    await bullToken.connect(user1).approve(router.address, 5000)
     await router.connect(user1).withdrawAll(bullToken.address, receiver1.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(10)
     expect(await weth.balanceOf(receiver1.address)).eq(4990) // 5000 - 10
@@ -454,49 +353,14 @@ describe("X2Router", function () {
     const receiver0 = { address: "0x88d8986ff52b01dd1527b705326709c9eb9871ca" }
     const receiver1 = { address: "0xa1e20cc111b2983b694cbb5cee73a33d6841574e" }
 
-    await factory.createMarket(
-      "X2:3XBULL:ETH/USD",
-      "X2:3XBEAR:ETH/USD",
-      feeToken.address,
-      priceFeed.address,
-      3, // multiplier
-      60 * 60, // unlockDelay of 1 hour
-      9000, // maxProfitBasisPoints, 90%
-      50 // minDeltaBasisPoints, 0.5%
-    )
-    const marketAddress1 = await factory.markets(1)
-    const market1 = await contractAt("X2Market", marketAddress1)
-    const bullToken1 = await contractAt("X2Token", await market1.bullToken())
-    await expect(router.connect(user0).withdrawAllETH(bullToken1.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Router: mismatched collateral")
-
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
-    await router.connect(user0).depositETH(bullToken.address, maxUint256, { value: 2000 })
+    await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: 2000 })
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await bullToken.balanceOf(user0.address)).eq(2000)
 
-    const token0 = await deployContract("X2Token", [market.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).withdrawAllETH(token0.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Market: unsupported token")
-
-    const token1 = await deployContract("X2Token", [user0.address, router.address, "X2:BULL"])
-    await expect(router.connect(user0).withdrawAllETH(token1.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Router: unsupported market")
-
-    await expect(router.connect(user0).withdrawAllETH(bullToken.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user0).withdrawAllETH(bullToken.address, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
-
+    await bullToken.connect(user0).approve(router.address, 2000)
     await router.connect(user0).withdrawAllETH(bullToken.address, receiver0.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await provider.getBalance(receiver0.address)).eq(2000)
@@ -505,7 +369,7 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await weth.balanceOf(user1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(0)
-    await router.connect(user1).depositETH(bullToken.address, maxUint256, { value: 5000 })
+    await router.connect(user1).depositETH(bullToken.address, user1.address, maxUint256, { value: 5000 })
     expect(await weth.balanceOf(market.address)).eq(5000)
     expect(await provider.getBalance(receiver1.address)).eq(0)
     expect(await bullToken.balanceOf(user1.address)).eq(5000)
@@ -513,19 +377,8 @@ describe("X2Router", function () {
     await factory.setFee(market.address, 20)
     await factory.setFeeReceiver(feeReceiver.address)
 
-    await expect(router.connect(user1).withdrawAllETH(bullToken.address, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 59 * 60)
-    await mineBlock(provider)
-
-    await expect(router.connect(user1).withdrawAllETH(bullToken.address, receiver1.address, maxUint256))
-      .to.be.revertedWith("X2Token: account not yet unlocked")
-
-    await increaseTime(provider, 2 * 60)
-    await mineBlock(provider)
-
     expect(await market.feeReserve()).eq(0)
+    await bullToken.connect(user1).approve(router.address, 5000)
     await router.connect(user1).withdrawAllETH(bullToken.address, receiver1.address, maxUint256)
     expect(await weth.balanceOf(market.address)).eq(10)
     expect(await provider.getBalance(receiver1.address)).eq(4990) // 5000 - 10
