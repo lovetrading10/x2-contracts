@@ -31,8 +31,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     address public override bullToken;
     address public override bearToken;
     address public priceFeed;
-    uint256 public multiplier;
-    uint256 public unlockDelay;
+    uint256 public multiplierBasisPoints;
     uint256 public maxProfitBasisPoints;
     uint256 public minDeltaBasisPoints;
     uint256 public lastPrice;
@@ -63,8 +62,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         address _collateralToken,
         address _feeToken,
         address _priceFeed,
-        uint256 _multiplier,
-        uint256 _unlockDelay,
+        uint256 _multiplierBasisPoints,
         uint256 _maxProfitBasisPoints,
         uint256 _minDeltaBasisPoints
     ) public {
@@ -76,8 +74,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         collateralToken = _collateralToken;
         feeToken = _feeToken;
         priceFeed = _priceFeed;
-        multiplier = _multiplier;
-        unlockDelay = _unlockDelay;
+        multiplierBasisPoints = _multiplierBasisPoints;
         maxProfitBasisPoints = _maxProfitBasisPoints;
         minDeltaBasisPoints = _minDeltaBasisPoints;
 
@@ -240,8 +237,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         // refSupply is the smaller of the two supplies
         uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
         uint256 delta = nextPrice > _lastPrice ? nextPrice.sub(_lastPrice) : _lastPrice.sub(nextPrice);
-        // profit is [(smaller supply) * (change in price) / (last price)] * multiplier
-        uint256 profit = refSupply.mul(delta).div(_lastPrice).mul(multiplier);
+        // profit is [(smaller supply) * (change in price) / (last price)] * multiplierBasisPoints
+        uint256 profit = refSupply.mul(delta).div(_lastPrice).mul(multiplierBasisPoints).div(BASIS_POINTS_DIVISOR);
 
         // cap the profit to the (max profit percentage) of the smaller supply
         uint256 maxProfit = refSupply.mul(maxProfitBasisPoints).div(BASIS_POINTS_DIVISOR);

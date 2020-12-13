@@ -2,7 +2,7 @@ const { expandDecimals } = require("../test/shared/utilities")
 const { sendTxn, deployContract, contractAt } = require("./helpers")
 
 async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
-  multiplier, unlockDelay, maxProfitBasisPoints, minDeltaBasisPoints, label
+  multiplierBasisPoints, maxProfitBasisPoints, minDeltaBasisPoints, label
 }) {
 
   await sendTxn(factory.createMarket(
@@ -10,8 +10,7 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
     bearSymbol,
     weth.address,
     priceFeed.address,
-    multiplier,
-    unlockDelay,
+    multiplierBasisPoints,
     maxProfitBasisPoints,
     minDeltaBasisPoints
   ), label)
@@ -27,8 +26,7 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
     router.address,
     weth.address,
     priceFeed.address,
-    multiplier,
-    unlockDelay,
+    multiplierBasisPoints,
     maxProfitBasisPoints,
     minDeltaBasisPoints
   )
@@ -56,8 +54,7 @@ async function main() {
     bearSymbol: "X2:3XBEAR:ETH/USD",
     weth,
     priceFeed,
-    multiplier: 3,
-    unlockDelay: 1 * 60, // 1 minute
+    multiplierBasisPoints: 30000,
     maxProfitBasisPoints: 9000, // 90%
     minDeltaBasisPoints: 50 // 0.5%
   })

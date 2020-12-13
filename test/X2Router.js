@@ -90,8 +90,7 @@ describe("X2Router", function () {
       "X2:3XBEAR:ETH/USD",
       feeToken.address,
       priceFeed.address,
-      3, // multiplier
-      60 * 60, // unlockDelay of 1 hour
+      30000, // multiplierBasisPoints, 300%
       9000, // maxProfitBasisPoints, 90%
       50 // minDeltaBasisPoints, 0.5%
     )
@@ -256,8 +255,7 @@ describe("X2Router", function () {
       "X2:3XBEAR:ETH/USD",
       feeToken.address,
       priceFeed.address,
-      3, // multiplier
-      60 * 60, // unlockDelay of 1 hour
+      30000, // multiplierBasisPoints, 300%
       9000, // maxProfitBasisPoints, 90%
       50 // minDeltaBasisPoints, 0.5%
     )

@@ -41,8 +41,7 @@ describe("X2Factory", function () {
       "X2:BEAR",
       weth.address,
       priceFeed.address,
-      5, // multiplier
-      120 * 60, // unlockDelay of 1 hour
+      50000, // multiplierBasisPoints, 500%
       8000, // maxProfitBasisPoints, 80%
       50 // minDeltaBasisPoints, 0.5%
     )).to.be.revertedWith("X2Factory: forbidden")
@@ -59,8 +58,7 @@ describe("X2Factory", function () {
       "X2:BEAR",
       weth.address,
       priceFeed.address,
-      5, // multiplier
-      120 * 60, // unlockDelay of 1 hour
+      50000, // multiplierBasisPoints, 500%
       8000, // maxProfitBasisPoints, 90%
       50 // minDeltaBasisPoints, 0.5%
     )
@@ -74,8 +72,7 @@ describe("X2Factory", function () {
       "X2:BEAR",
       weth.address,
       priceFeed.address,
-      5, // multiplier
-      120 * 60, // unlockDelay of 1 hour
+      50000, // multiplierBasisPoints, 500%
       8000, // maxProfitBasisPoints, 90%
       50 // minDeltaBasisPoints, 0.5%
     )).to.be.revertedWith("X2Factory: forbidden")
@@ -85,8 +82,7 @@ describe("X2Factory", function () {
       "X2:BEAR",
       weth.address,
       priceFeed.address,
-      5, // multiplier
-      120 * 60, // unlockDelay of 2 hours
+      50000, // multiplierBasisPoints, 500%
       8000, // maxProfitBasisPoints, 90%
       50 // minDeltaBasisPoints, 0.5%
     )
@@ -100,8 +96,7 @@ describe("X2Factory", function () {
     expect(await market.factory()).eq(factory.address)
     expect(await market.collateralToken()).eq(weth.address)
     expect(await market.priceFeed()).eq(priceFeed.address)
-    expect(await market.multiplier()).eq(5)
-    expect(await market.unlockDelay()).eq(120 * 60)
+    expect(await market.multiplierBasisPoints()).eq(50000)
     expect(await market.maxProfitBasisPoints()).eq(8000)
     expect(await market.lastPrice()).eq(toChainlinkPrice(1000))
 
@@ -119,10 +114,9 @@ describe("X2Factory", function () {
       weth.address,
       feeToken.address,
       priceFeed.address,
-      5,
-      120 * 60,
-      8000,
-      50
+      50000, // multiplierBasisPoints, 500%
+      8000, // maxProfitBasisPoints, 90%
+      50 // minDeltaBasisPoints, 0.5%
     )).to.be.revertedWith("X2Market: already initialized")
 
     await expect(bullToken.initialize(market.address, "X2:BULL"))

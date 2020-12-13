@@ -31,8 +31,7 @@ contract X2Factory is IX2Factory {
         string bearToken,
         address collateralToken,
         address priceFeed,
-        uint256 multiplier,
-        uint256 unlockDelay,
+        uint256 multiplierBasisPoints,
         uint256 maxProfitBasisPoints,
         uint256 index
     );
@@ -65,8 +64,7 @@ contract X2Factory is IX2Factory {
         string memory _bearTokenSymbol,
         address _collateralToken,
         address _priceFeed,
-        uint256 _multiplier,
-        uint256 _unlockDelay,
+        uint256 _multiplierBasisPoints,
         uint256 _maxProfitBasisPoints,
         uint256 _minDeltaBasisPoints
     ) external returns (address, address, address) {
@@ -81,8 +79,7 @@ contract X2Factory is IX2Factory {
             _collateralToken,
             feeToken,
             _priceFeed,
-            _multiplier,
-            _unlockDelay,
+            _multiplierBasisPoints,
             _maxProfitBasisPoints,
             _minDeltaBasisPoints
         );
@@ -103,8 +100,7 @@ contract X2Factory is IX2Factory {
             _bearTokenSymbol,
             _collateralToken,
             _priceFeed,
-            _multiplier,
-            _unlockDelay,
+            _multiplierBasisPoints,
             _maxProfitBasisPoints,
             markets.length - 1
         );
