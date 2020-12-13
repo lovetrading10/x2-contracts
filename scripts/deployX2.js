@@ -23,7 +23,6 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
 
   console.info("Deployed market: " + market.address,
     factory.address,
-    router.address,
     weth.address,
     priceFeed.address,
     multiplierBasisPoints,
@@ -41,28 +40,28 @@ async function main() {
   const weth = await contractAt("WETH", "0xd0a1e359811322d97991e03f863a0c30c2cf029c") // KOVAN
 
   const feeToken = await deployContract("X2Fee", [expandDecimals(1000, 18)])
-  const feeReceiver = await deployContract("X2FeeReceiver", [])
-  const factory = await deployContract("X2Factory", [feeToken.address])
+  // const feeReceiver = await deployContract("X2FeeReceiver", [])
+  const factory = await deployContract("X2Factory", [feeToken.address, weth.address])
   const router = await deployContract("X2Router", [factory.address, weth.address])
-  await sendTxn(factory.setRouter(router.address), "factory.setRouter")
 
   const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" }
 
   const { market, bullToken, bearToken } = await createMarket({
     factory,
-    bullSymbol: "X2:3XBULL:ETH/USD",
-    bearSymbol: "X2:3XBEAR:ETH/USD",
+    bullSymbol: "X2:10XBULL:ETH/USD",
+    bearSymbol: "X2:10XBEAR:ETH/USD",
     weth,
     priceFeed,
-    multiplierBasisPoints: 30000,
+    multiplierBasisPoints: 100000, // 10x, 1000%
     maxProfitBasisPoints: 9000, // 90%
-    minDeltaBasisPoints: 50 // 0.5%
+    minDeltaBasisPoints: 50, // 0.5%
+    label: "Deploy 10X ETH/USD market"
   })
 
   // await sendTxn(factory.setFee(market.address, 20), "factory.setFee")
   // await sendTxn(factory.setFeeReceiver(feeReceiver.address), "factory.setFeeReceiver")
 
-  return { weth, feeToken, feeReceiver, factory, router, priceFeed, market, bullToken, bearToken }
+  return { weth, feeToken, factory, router, priceFeed, market, bullToken, bearToken }
 }
 
 main()
