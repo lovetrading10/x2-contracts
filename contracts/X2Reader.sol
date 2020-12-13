@@ -28,7 +28,7 @@ contract X2Reader {
         address bearToken = IX2Market(_market).bearToken();
 
         uint256 bullAllowance = IERC20(bullToken).allowance(_account, _router);
-        uint256 bearAllowance = IERC20(bullToken).allowance(_account, _router);
+        uint256 bearAllowance = IERC20(bearToken).allowance(_account, _router);
 
         return(
             IX2Market(_market).cachedDivisors(bullToken), // index: 0
