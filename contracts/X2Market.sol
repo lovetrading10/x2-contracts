@@ -50,6 +50,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     event PriceChange(uint256 price);
     event DistributeFees(uint256 fees);
     event DistributeInterest(uint256 interest);
+    event Deposit(address account, uint256 amount, uint256 fee, uint256 balance);
+    event Withdraw(address account, uint256 amount, uint256 fee, uint256 balance);
 
     modifier onlyFactory() {
         require(msg.sender == factory, "X2Market: forbidden");
@@ -114,6 +116,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
         _updateCollateralTokenBalance();
         _updateFeeTokenBalance();
+
+        emit Deposit(_receiver, depositAmount, fee, IERC20(_token).balanceOf(_receiver));
         return depositAmount;
     }
 
@@ -128,6 +132,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 
         _updateCollateralTokenBalance();
+
+        emit Withdraw(_receiver, withdrawAmount, fee, IERC20(_token).balanceOf(_receiver));
         return withdrawAmount;
     }
 
