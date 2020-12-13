@@ -8,7 +8,7 @@ use(solidity)
 
 describe("X2Market", function () {
   const provider = waffle.provider
-  const [wallet, user0, user1, user2] = provider.getWallets()
+  const [wallet, user0, user1, user2, user3] = provider.getWallets()
   let weth
   let factory
   let router
@@ -72,6 +72,105 @@ describe("X2Market", function () {
   it("distributeFees", async () => {
     await expect(market.distributeFees())
       .to.be.revertedWith("X2Market: empty feeReceiver")
+
+    await factory.setFee(market.address, 20)
+    await factory.setFeeReceiver(feeReceiver.address)
+    expect(await bullToken.balanceOf(user0.address)).eq(0)
+    await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: 1000 })
+    expect(await bullToken.balanceOf(user0.address)).eq(998)
+    expect(await market.feeReserve()).eq(2)
+
+    expect(await weth.balanceOf(feeReceiver.address)).eq(0)
+    await market.distributeFees()
+    expect(await market.feeReserve()).eq(0)
+    expect(await weth.balanceOf(feeReceiver.address)).eq(2)
+
+    await weth.connect(user1).deposit({ value: 2000 })
+    await weth.connect(user1).transfer(market.address, 2000)
+    expect(await bullToken.balanceOf(user1.address)).eq(0)
+    await market.deposit(bullToken.address, user1.address, false)
+    expect(await bullToken.balanceOf(user1.address)).eq(1996)
+    expect(await market.feeReserve()).eq(4)
+
+    await weth.connect(user2).deposit({ value: 5000 })
+    await weth.connect(user2).transfer(market.address, 5000)
+    expect(await bullToken.balanceOf(user2.address)).eq(0)
+    await market.deposit(bullToken.address, user2.address, false)
+    expect(await bullToken.balanceOf(user2.address)).eq(4990)
+    expect(await market.feeReserve()).eq(14)
+
+    await market.distributeFees()
+    expect(await weth.balanceOf(feeReceiver.address)).eq(16)
+    expect(await market.feeReserve()).eq(0)
+  })
+
+  it("distributeInterest", async () => {
+    await expect(market.distributeInterest())
+      .to.be.revertedWith("X2Market: empty feeReceiver")
+
+    await factory.setFee(market.address, 20)
+    await factory.setFeeReceiver(feeReceiver.address)
+    expect(await bullToken.balanceOf(user0.address)).eq(0)
+    await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: 1000 })
+    expect(await bullToken.balanceOf(user0.address)).eq(998)
+    expect(await market.feeReserve()).eq(2)
+    expect(await market.interestReserve()).eq(0)
+
+    expect(await weth.balanceOf(feeReceiver.address)).eq(0)
+    await market.distributeFees()
+    expect(await market.feeReserve()).eq(0)
+    expect(await weth.balanceOf(feeReceiver.address)).eq(2)
+
+    await weth.connect(user1).deposit({ value: 2000 })
+    await weth.connect(user1).transfer(market.address, 2000)
+    expect(await bullToken.balanceOf(user1.address)).eq(0)
+    await market.deposit(bullToken.address, user1.address, false)
+    expect(await bullToken.balanceOf(user1.address)).eq(1996)
+    expect(await market.feeReserve()).eq(4)
+    expect(await market.interestReserve()).eq(0)
+
+    await weth.connect(user2).deposit({ value: 5000 })
+    await weth.connect(user2).transfer(market.address, 5000)
+    expect(await bearToken.balanceOf(user2.address)).eq(0)
+    await market.deposit(bearToken.address, user2.address, false)
+    expect(await bearToken.balanceOf(user2.address)).eq(4990)
+    expect(await market.feeReserve()).eq(14)
+    expect(await market.interestReserve()).eq(0)
+
+    await market.distributeFees()
+    expect(await weth.balanceOf(feeReceiver.address)).eq(16)
+    expect(await market.feeReserve()).eq(0)
+    expect(await market.interestReserve()).eq(0)
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+    await market.rebase()
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1210))
+    await weth.connect(user3).deposit({ value: 10000 })
+    await weth.connect(user3).transfer(market.address, 10000)
+
+    expect(await bullToken.balanceOf(user3.address)).eq(0)
+    await market.deposit(bullToken.address, user3.address, false)
+    expect(await bullToken.balanceOf(user3.address)).eq(7677) // 9980 / 1.3
+    expect(await market.feeReserve()).eq(20)
+    expect(await market.interestReserve()).eq(0)
+
+    expect(await weth.balanceOf(user3.address)).eq(0)
+    await market.connect(user3).withdraw(bullToken.address, 7677, user3.address)
+    expect(await weth.balanceOf(user3.address)).eq(7662) // 15 used for fee
+    expect(await market.feeReserve()).eq(35)
+    expect(await market.interestReserve()).eq(2303) // 9980 - 7677
+
+    expect(await weth.balanceOf(feeReceiver.address)).eq(16)
+    await market.distributeInterest()
+    expect(await weth.balanceOf(feeReceiver.address)).eq(2319)
+    expect(await market.feeReserve()).eq(35)
+    expect(await market.interestReserve()).eq(0)
+
+    await market.distributeFees()
+    expect(await weth.balanceOf(feeReceiver.address)).eq(2354)
+    expect(await market.feeReserve()).eq(0)
+    expect(await market.interestReserve()).eq(0)
   })
 
   it("deposit bullToken", async () => {
@@ -79,16 +178,33 @@ describe("X2Market", function () {
     expect(await bullToken.balanceOf(user0.address)).eq(0)
     expect(await weth.balanceOf(market.address)).eq(0)
 
+    expect(await market.collateralTokenBalance()).eq(0)
     const tx = await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: expandDecimals(10, 18) })
     await reportGasUsed(provider, tx, "depositETH gas used")
+    expect(await market.collateralTokenBalance()).eq(expandDecimals(10, 18))
 
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+
+    await expect(market.connect(user0).deposit(bullToken.address, user0.address, false))
+      .to.be.revertedWith("X2Market: insufficient collateral sent")
+
+    expect(await market.collateralTokenBalance()).eq(expandDecimals(10, 18))
+    expect(await weth.balanceOf(user1.address)).eq(0)
+    await weth.connect(user1).deposit({ value: expandDecimals(5, 18) })
+    expect(await weth.balanceOf(user1.address)).eq(expandDecimals(5, 18))
+
+    await weth.connect(user1).transfer(market.address, expandDecimals(5, 18))
+    expect(await bullToken.balanceOf(user2.address)).eq(0)
+    await market.connect(user2).deposit(bullToken.address, user2.address, false)
+    expect(await bullToken.balanceOf(user2.address)).eq(expandDecimals(5, 18))
+    expect(await market.collateralTokenBalance()).eq(expandDecimals(15, 18))
   })
 
   it("withdraw bullToken", async () => {
-    const receiver = { address: "0xd4e0a14f14bef2131384f3abdb9984ea50cef442" }
+    const receiver0 = { address: "0xd4e0a14f14bef2131384f3abdb9984ea50cef442" }
+    const receiver1 = { address: "0xc7a9db43bcacdd7692fac547233bfc3dba4cb4ff" }
     expect(await bullToken.totalSupply()).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(0)
     expect(await weth.balanceOf(market.address)).eq(0)
@@ -102,15 +218,30 @@ describe("X2Market", function () {
     await increaseTime(provider, 61 * 60)
     await mineBlock(provider)
 
-    expect(await provider.getBalance(receiver.address)).eq(0)
+    expect(await provider.getBalance(receiver0.address)).eq(0)
 
     await bullToken.connect(user0).approve(router.address, expandDecimals(10, 18))
-    const tx = await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(10, 18), receiver.address, maxUint256)
+    const tx = await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(10, 18), receiver0.address, maxUint256)
     await reportGasUsed(provider, tx, "withdrawETH gas used")
 
-    expect(await provider.getBalance(receiver.address)).eq(expandDecimals(10, 18))
+    expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.balanceOf(user0.address)).eq(0)
     expect(await weth.balanceOf(market.address)).eq(0)
+    expect(await bullToken.totalSupply()).eq(0)
+
+    expect(await bullToken.balanceOf(user1.address)).eq(0)
+    expect(await weth.balanceOf(user1.address)).eq(0)
+    await router.connect(user1).depositETH(bullToken.address, user1.address, maxUint256, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
+    expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+
+    await expect(market.connect(user1).withdraw(bullToken.address, expandDecimals(11, 18), receiver1.address))
+      .to.be.revertedWith("SafeMath: subtraction overflow")
+
+    expect(await weth.balanceOf(receiver1.address)).eq(0)
+    await market.connect(user1).withdraw(bullToken.address, expandDecimals(10, 18), receiver1.address)
+    expect(await bullToken.balanceOf(user1.address)).eq(0)
+    expect(await weth.balanceOf(receiver1.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(0)
   })
 
@@ -132,7 +263,9 @@ describe("X2Market", function () {
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await bearToken.totalSupply()).eq(0)
 
+    expect(await market.interestReserve()).eq(0)
     await router.connect(user0).depositETH(bearToken.address, user0.address, maxUint256, { value: expandDecimals(10, 18) })
+    expect(await market.interestReserve()).eq(0)
 
     expect(await bearToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(10, 18))
@@ -143,11 +276,13 @@ describe("X2Market", function () {
 
     await bearToken.connect(user0).approve(router.address, expandDecimals(10, 18))
     expect(await provider.getBalance(receiver.address)).eq(0)
+    expect(await market.interestReserve()).eq(0)
     await router.connect(user0).withdrawETH(bearToken.address, expandDecimals(10, 18), receiver.address, maxUint256)
     expect(await provider.getBalance(receiver.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.balanceOf(user0.address)).eq(0)
     expect(await weth.balanceOf(market.address)).eq(0)
     expect(await bearToken.totalSupply()).eq(0)
+    expect(await market.interestReserve()).eq(0)
   })
 
   it("rebase without counterparty tokens", async () => {
@@ -178,12 +313,14 @@ describe("X2Market", function () {
     expect(await bullToken.totalSupply()).eq(0)
     expect(await bearToken.totalSupply()).eq(0)
 
+    expect(await market.interestReserve()).eq(0)
     await router.connect(user0).depositETH(bullToken.address, user0.address, maxUint256, { value: expandDecimals(10, 18) })
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(10, 18))
 
     await router.connect(user1).depositETH(bearToken.address, user1.address, maxUint256, { value: expandDecimals(10, 18) })
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
 
+    expect(await market.interestReserve()).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
@@ -200,6 +337,7 @@ describe("X2Market", function () {
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
+    expect(await market.interestReserve()).eq(0)
   })
 
   it("uses a mark price", async () => {
@@ -361,8 +499,10 @@ describe("X2Market", function () {
     expect(await provider.getBalance(receiver0.address)).eq(0)
     expect(await provider.getBalance(receiver1.address)).eq(0)
 
+    expect(await market.interestReserve()).eq(0)
     await bullToken.connect(user0).approve(router.address, "15100000000000000000")
     await router.connect(user0).withdrawETH(bullToken.address, "15100000000000000000", receiver0.address, maxUint256)
+    expect(await market.interestReserve()).eq("4410000000000000000")
 
     expect(await market.cachedDivisors(bullToken.address)).eq("51255766273705791901")
     expect(await market.cachedDivisors(bearToken.address)).eq("2040816326530612244897")
@@ -375,6 +515,7 @@ describe("X2Market", function () {
 
     await bearToken.connect(user1).approve(router.address, "490000000000000000")
     await router.connect(user1).withdrawETH(bearToken.address, "490000000000000000", receiver1.address, maxUint256)
+    expect(await market.interestReserve()).eq("4410000000000000000")
 
     expect(await provider.getBalance(receiver0.address)).eq("15100000000000000000")
     expect(await provider.getBalance(receiver1.address)).eq("490000000000000000")
@@ -409,6 +550,7 @@ describe("X2Market", function () {
     await router.connect(user1).depositETH(bearToken.address, user1.address, maxUint256, { value: expandDecimals(10, 18) })
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))
 
+    expect(await market.interestReserve()).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await weth.balanceOf(market.address)).eq(expandDecimals(20, 18))

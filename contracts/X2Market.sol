@@ -99,6 +99,8 @@ contract X2Market is IX2Market, ReentrancyGuard {
     function deposit(address _token, address _receiver, bool _withFeeSubsidy) public override nonReentrant returns (uint256) {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
         uint256 amount = _getCollateralTokenBalance().sub(collateralTokenBalance);
+        require(amount > 0, "X2Market: insufficient collateral sent");
+
         uint256 feeSubsidy = 0;
         if (_withFeeSubsidy && collateralToken == weth) {
             feeSubsidy = _getFeeTokenBalance().sub(feeTokenBalance);

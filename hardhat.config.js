@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-etherscan")
 require("@nomiclabs/hardhat-waffle")
+require("@nomiclabs/hardhat-solhint")
 
 const { KOVAN_URL, KOVAN_DEPLOY_KEY, ETHERSCAN_API_KEY } = require("./env.json")
 
