@@ -44,7 +44,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     bool public isInitialized;
 
     mapping (address => uint256) public previousDivisors;
-    mapping (address => uint256) public cachedDivisors;
+    mapping (address => uint256) public override cachedDivisors;
 
     event Fee(uint256 fee, uint256 subsidy);
     event PriceChange(uint256 price, uint256 bullDivisor, uint256 bearDivisor);
