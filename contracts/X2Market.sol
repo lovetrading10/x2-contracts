@@ -103,12 +103,12 @@ contract X2Market is IX2Market, ReentrancyGuard {
         uint256 amount = _getCollateralTokenBalance().sub(collateralTokenBalance);
         require(amount > 0, "X2Market: insufficient collateral sent");
 
+        rebase();
+
         uint256 feeSubsidy = 0;
         if (_withFeeSubsidy && collateralToken == weth) {
             feeSubsidy = _getFeeTokenBalance().sub(feeTokenBalance);
         }
-
-        rebase();
 
         uint256 fee = _collectFees(amount, feeSubsidy);
         uint256 depositAmount = amount.sub(fee);
@@ -121,13 +121,18 @@ contract X2Market is IX2Market, ReentrancyGuard {
         return depositAmount;
     }
 
-    function withdraw(address _token, uint256 _amount, address _receiver) public override nonReentrant returns (uint256) {
+    function withdraw(address _token, uint256 _amount, address _receiver, bool _withFeeSubsidy) public override nonReentrant returns (uint256) {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
         rebase();
 
         IX2Token(_token).burn(msg.sender, _amount);
 
-        uint256 fee = _collectFees(_amount, 0);
+        uint256 feeSubsidy = 0;
+        if (_withFeeSubsidy && collateralToken == weth) {
+            feeSubsidy = _getFeeTokenBalance().sub(feeTokenBalance);
+        }
+
+        uint256 fee = _collectFees(_amount, feeSubsidy);
         uint256 withdrawAmount = _amount.sub(fee);
         IERC20(collateralToken).safeTransfer(_receiver, withdrawAmount);
 

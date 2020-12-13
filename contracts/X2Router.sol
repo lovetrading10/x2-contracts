@@ -36,63 +36,51 @@ contract X2Router is IX2Router {
     function deposit(
         address _token,
         uint256 _amount,
+        uint256 _subsidy,
         address _receiver,
         uint256 _deadline
     ) external ensureDeadline(_deadline) {
         address market = _getMarket(_token);
+        if (_subsidy > 0) {
+            _transferFeeTokenToMarket(market, _subsidy);
+        }
         _transferCollateralToMarket(market, _amount);
-        IX2Market(market).deposit(_token, _receiver, false);
+        IX2Market(market).deposit(_token, _receiver, _subsidy > 0);
     }
 
     function depositETH(
         address _token,
-        address _receiver,
-        uint256 _deadline
-    ) external payable ensureDeadline(_deadline) {
-        address market = _getMarket(_token);
-        _transferETHToMarket(market, msg.value);
-        IX2Market(market).deposit(_token, _receiver, false);
-    }
-
-    function depositSupportingFeeSubsidy(
-        address _token,
-        uint256 _amount,
-        uint256 _subsidy,
-        address _receiver,
-        uint256 _deadline
-    ) external ensureDeadline(_deadline) {
-        address market = _getMarket(_token);
-        _transferCollateralToMarket(market, _amount);
-        _transferFeeTokenToMarket(market, _subsidy);
-        IX2Market(market).deposit(_token, _receiver, true);
-    }
-
-    function depositETHSupportingFeeSubsidy(
-        address _token,
         uint256 _subsidy,
         address _receiver,
         uint256 _deadline
     ) external payable ensureDeadline(_deadline) {
         address market = _getMarket(_token);
+        if (_subsidy > 0) {
+            _transferFeeTokenToMarket(market, _subsidy);
+        }
         _transferETHToMarket(market, msg.value);
-        _transferFeeTokenToMarket(market, _subsidy);
-        IX2Market(market).deposit(_token, _receiver, true);
+        IX2Market(market).deposit(_token, _receiver, _subsidy > 0);
     }
 
     function withdraw(
         address _token,
         uint256 _amount,
+        uint256 _subsidy,
         address _receiver,
         uint256 _deadline
     ) external ensureDeadline(_deadline) {
         IERC20(_token).transferFrom(msg.sender, address(this), _amount);
         address market = _getMarket(_token);
-        IX2Market(market).withdraw(_token, _amount, _receiver);
+        if (_subsidy > 0) {
+            _transferFeeTokenToMarket(market, _subsidy);
+        }
+        IX2Market(market).withdraw(_token, _amount, _receiver, _subsidy > 0);
     }
 
     function withdrawETH(
         address _token,
         uint256 _amount,
+        uint256 _subsidy,
         address _receiver,
         uint256 _deadline
     ) external ensureDeadline(_deadline) {
@@ -100,8 +88,11 @@ contract X2Router is IX2Router {
 
         address market = _getMarket(_token);
         require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
+        if (_subsidy > 0) {
+            _transferFeeTokenToMarket(market, _subsidy);
+        }
 
-        uint256 withdrawAmount = IX2Market(market).withdraw(_token, _amount, address(this));
+        uint256 withdrawAmount = IX2Market(market).withdraw(_token, _amount, address(this), _subsidy > 0);
         IWETH(weth).withdraw(withdrawAmount);
 
         (bool success,) = _receiver.call{value: withdrawAmount}("");
@@ -110,26 +101,34 @@ contract X2Router is IX2Router {
 
     function withdrawAll(
         address _token,
+        uint256 _subsidy,
         address _receiver,
         uint256 _deadline
     ) external ensureDeadline(_deadline) {
         address market = _getMarket(_token);
+        if (_subsidy > 0) {
+            _transferFeeTokenToMarket(market, _subsidy);
+        }
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
         IERC20(_token).transferFrom(msg.sender, address(this), amount);
-        IX2Market(market).withdraw(_token, amount, _receiver);
+        IX2Market(market).withdraw(_token, amount, _receiver, _subsidy > 0);
     }
 
     function withdrawAllETH(
         address _token,
+        uint256 _subsidy,
         address _receiver,
         uint256 _deadline
     ) external ensureDeadline(_deadline) {
         address market = _getMarket(_token);
+        if (_subsidy > 0) {
+            _transferFeeTokenToMarket(market, _subsidy);
+        }
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
         require(IX2Market(market).collateralToken() == weth, "X2Router: mismatched collateral");
 
         IERC20(_token).transferFrom(msg.sender, address(this), amount);
-        uint256 withdrawAmount = IX2Market(market).withdraw(_token, amount, address(this));
+        uint256 withdrawAmount = IX2Market(market).withdraw(_token, amount, address(this), _subsidy > 0);
         IWETH(weth).withdraw(withdrawAmount);
 
         (bool success,) = _receiver.call{value: withdrawAmount}("");
