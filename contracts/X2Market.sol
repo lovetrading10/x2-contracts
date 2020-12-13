@@ -47,7 +47,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
     mapping (address => uint256) public cachedDivisors;
 
     event Fee(uint256 fee, uint256 subsidy);
-    event PriceChange(uint256 price);
+    event PriceChange(uint256 price, uint256 bullDivisor, uint256 bearDivisor);
     event DistributeFees(uint256 fees);
     event DistributeInterest(uint256 interest);
     event Deposit(address account, uint256 amount, uint256 fee, uint256 balance);
@@ -185,7 +185,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         cachedDivisors[bearToken] = bearDivisor;
 
         lastPrice = nextPrice;
-        emit PriceChange(nextPrice);
+        emit PriceChange(nextPrice, bullDivisor, bearDivisor);
 
         return true;
     }
