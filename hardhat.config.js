@@ -2,7 +2,8 @@ require("@nomiclabs/hardhat-etherscan")
 require("@nomiclabs/hardhat-waffle")
 require("@nomiclabs/hardhat-solhint")
 
-const { KOVAN_URL, KOVAN_DEPLOY_KEY, ETHERSCAN_API_KEY } = require("./env.json")
+const { KOVAN_URL, KOVAN_DEPLOY_KEY, MAINNET_URL, MAINNET_DEPLOY_KEY,
+  ETHERSCAN_API_KEY } = require("./env.json")
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -26,6 +27,11 @@ module.exports = {
     kovan: {
       url: KOVAN_URL,
       accounts: [KOVAN_DEPLOY_KEY]
+    },
+    mainnet: {
+      url: MAINNET_URL,
+      gasPrice: 40000000000,
+      accounts: [MAINNET_DEPLOY_KEY]
     }
   },
   etherscan: {

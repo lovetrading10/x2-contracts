@@ -36,20 +36,21 @@ async function createMarket({ factory, bullSymbol, bearSymbol, weth, priceFeed,
 }
 
 async function main() {
-  // const weth = await contractAt("WETH", "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2") // MAINNET
-  const weth = await contractAt("WETH", "0xd0a1e359811322d97991e03f863a0c30c2cf029c") // KOVAN
+  const weth = await contractAt("WETH", "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2") // MAINNET
+  // const weth = await contractAt("WETH", "0xd0a1e359811322d97991e03f863a0c30c2cf029c") // KOVAN
 
-  const feeToken = await deployContract("X2Fee", [expandDecimals(1000, 18)])
+  const feeToken = await deployContract("X2Fee", [expandDecimals(2000, 18)])
   // const feeReceiver = await deployContract("X2FeeReceiver", [])
   const factory = await deployContract("X2Factory", [feeToken.address, weth.address])
   const router = await deployContract("X2Router", [factory.address, weth.address])
 
-  const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" }
+  const priceFeed = { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" } // MAINNET
+  // const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" } // KOVAN
 
   const { market, bullToken, bearToken } = await createMarket({
     factory,
-    bullSymbol: "X2:10XBULL:ETH/USD",
-    bearSymbol: "X2:10XBEAR:ETH/USD",
+    bullSymbol: "10XBULL:ETH/USD",
+    bearSymbol: "10XBEAR:ETH/USD",
     weth,
     priceFeed,
     multiplierBasisPoints: 100000, // 10x, 1000%
