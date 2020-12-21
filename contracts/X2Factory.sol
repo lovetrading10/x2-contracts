@@ -7,6 +7,7 @@ import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2Factory.sol";
 import "./X2Market.sol";
+import "./X2ETHMarket.sol";
 import "./X2Token.sol";
 
 contract X2Factory is IX2Factory {
@@ -57,6 +58,51 @@ contract X2Factory is IX2Factory {
 
     function enableFreeMarketCreation() external onlyGov {
         freeMarketCreation = true;
+    }
+
+    function createETHMarket(
+        string memory _bullTokenSymbol,
+        string memory _bearTokenSymbol,
+        address _priceFeed,
+        uint256 _multiplierBasisPoints,
+        uint256 _maxProfitBasisPoints,
+        uint256 _minDeltaBasisPoints
+    ) external returns (address, address, address) {
+        if (!freeMarketCreation) {
+            require(msg.sender == gov, "X2Factory: forbidden");
+        }
+
+        X2ETHMarket market = new X2ETHMarket();
+        market.initialize(
+            address(this),
+            _priceFeed,
+            _multiplierBasisPoints,
+            _maxProfitBasisPoints,
+            _minDeltaBasisPoints
+        );
+
+        X2Token bullToken = new X2Token();
+        bullToken.initialize(address(market), _bullTokenSymbol);
+
+        X2Token bearToken = new X2Token();
+        bearToken.initialize(address(market), _bearTokenSymbol);
+
+        market.setBullToken(address(bullToken));
+        market.setBearToken(address(bearToken));
+
+        markets.push(address(market));
+
+        emit CreateMarket(
+            _bullTokenSymbol,
+            _bearTokenSymbol,
+            address(0),
+            _priceFeed,
+            _multiplierBasisPoints,
+            _maxProfitBasisPoints,
+            markets.length - 1
+        );
+
+        return (address(market), address(bullToken), address(bearToken));
     }
 
     function createMarket(

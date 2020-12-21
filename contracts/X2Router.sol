@@ -30,7 +30,7 @@ contract X2Router is IX2Router {
     }
 
     receive() external payable {
-        require(msg.sender == weth, "X2Token: unsupported sender");
+        require(msg.sender == weth, "X2Router: unsupported sender");
     }
 
     function deposit(
@@ -96,7 +96,7 @@ contract X2Router is IX2Router {
         IWETH(weth).withdraw(withdrawAmount);
 
         (bool success,) = _receiver.call{value: withdrawAmount}("");
-        require(success, "X2Token: eth transfer failed");
+        require(success, "X2Router: eth transfer failed");
     }
 
     function withdrawAll(
@@ -132,7 +132,7 @@ contract X2Router is IX2Router {
         IWETH(weth).withdraw(withdrawAmount);
 
         (bool success,) = _receiver.call{value: withdrawAmount}("");
-        require(success, "X2Token: eth transfer failed");
+        require(success, "X2Router: eth transfer failed");
     }
 
     function _transferETHToMarket(address _market, uint256 _amount) private {
