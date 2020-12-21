@@ -992,4 +992,51 @@ describe("X2Market", function () {
     expect(await bullToken.totalSupply()).eq(0)
     expect(await bearToken.totalSupply()).eq(0)
   })
+
+  it("gas usage", async () => {
+    const receiver0 = { address: "0x9ef006507b62e5f17c0a454c913f7ed9dc76d56b" }
+    const tx0 = await router.connect(user0).depositETH(bullToken.address, 0, user0.address, maxUint256, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx0, "depositETH gas used")
+
+    await bullToken.connect(user0).approve(router.address, expandDecimals(10, 18))
+    const tx1 = await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(5, 18), 0, receiver0.address, maxUint256)
+    await reportGasUsed(provider, tx1, "withdrawETH gas used")
+
+    const tx2 = await router.connect(user0).withdrawAllETH(bullToken.address, 0, receiver0.address, maxUint256)
+    await reportGasUsed(provider, tx2, "withdrawAllETH gas used")
+  })
+
+  it("gas usage", async () => {
+    const receiver0 = { address: "0x1cc0744c5106bb47a61c4e41f517cb6f1c49b547" }
+    const tx0 = await router.connect(user0).depositETH(bullToken.address, 0, user0.address, maxUint256, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx0, "tx0 depositETH gas used")
+
+    const tx1 = await router.connect(user0).depositETH(bearToken.address, 0, user0.address, maxUint256, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx1, "tx1 depositETH gas used")
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+
+    const tx2 = await router.connect(user0).depositETH(bullToken.address, 0, user0.address, maxUint256, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx2, "tx2 depositETH gas used")
+
+    await bullToken.connect(user0).approve(router.address, expandDecimals(100, 18))
+    await bearToken.connect(user0).approve(router.address, expandDecimals(100, 18))
+    const tx3 = await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(1, 18), 0, receiver0.address, maxUint256)
+    await reportGasUsed(provider, tx3, "tx3 withdrawETH gas used")
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1200))
+
+    const tx4 = await router.connect(user0).withdrawETH(bullToken.address, expandDecimals(1, 18), 0, receiver0.address, maxUint256)
+    await reportGasUsed(provider, tx4, "tx4 withdrawETH gas used")
+
+    const tx5 = await router.connect(user0).withdrawAllETH(bullToken.address, 0, receiver0.address, maxUint256)
+    await reportGasUsed(provider, tx5, "tx5 withdrawAllETH gas used")
+
+    await router.connect(user0).depositETH(bullToken.address, 0, user0.address, maxUint256, { value: expandDecimals(10, 18) })
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1300))
+
+    const tx6 = await router.connect(user0).withdrawAllETH(bearToken.address, 0, receiver0.address, maxUint256)
+    await reportGasUsed(provider, tx6, "tx6 withdrawAllETH gas used")
+  })
 })
