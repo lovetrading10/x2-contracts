@@ -65,8 +65,7 @@ contract X2Factory is IX2Factory {
         string memory _bearTokenSymbol,
         address _priceFeed,
         uint256 _multiplierBasisPoints,
-        uint256 _maxProfitBasisPoints,
-        uint256 _minDeltaBasisPoints
+        uint256 _maxProfitBasisPoints
     ) external returns (address, address, address) {
         if (!freeMarketCreation) {
             require(msg.sender == gov, "X2Factory: forbidden");
@@ -77,8 +76,7 @@ contract X2Factory is IX2Factory {
             address(this),
             _priceFeed,
             _multiplierBasisPoints,
-            _maxProfitBasisPoints,
-            _minDeltaBasisPoints
+            _maxProfitBasisPoints
         );
 
         X2Token bullToken = new X2Token();

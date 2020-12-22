@@ -29,8 +29,7 @@ describe("X2ETHMarket", function () {
       "X2:3XBEAR:ETH/USD",
       priceFeed.address,
       30000, // multiplierBasisPoints, 300%
-      9000, // maxProfitBasisPoints, 90%
-      50 // minDeltaBasisPoints, 0.5%
+      9000 // maxProfitBasisPoints, 90%
     )
 
     const marketAddress = await factory.markets(1)
@@ -44,18 +43,33 @@ describe("X2ETHMarket", function () {
     expect(await market.priceFeed()).eq(priceFeed.address)
     expect(await market.multiplierBasisPoints()).eq(30000)
     expect(await market.maxProfitBasisPoints()).eq(9000)
-    expect(await market.minDeltaBasisPoints()).eq(50)
 
-    expect(await market.cachedDivisors(bullToken.address)).eq("100000000000000000000")
-    expect(await market.cachedDivisors(bearToken.address)).eq("100000000000000000000")
+    expect(await market.previousBullDivisor()).eq("10000000000")
+    expect(await market.previousBearDivisor()).eq("10000000000")
+    expect(await market.cachedBullDivisor()).eq("10000000000")
+    expect(await market.cachedBearDivisor()).eq("10000000000")
 
     expect(await bullToken.market()).eq(market.address)
     expect(await bearToken.market()).eq(market.address)
   })
 
   it("deposit", async () => {
-    const tx = await market.deposit(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
-    await reportGasUsed(provider, tx, "deposit")
+    const tx0 = await market.connect(user0).deposit(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx0, "tx0 deposit gas used")
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+
+    const tx1 = await market.connect(user0).deposit(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx1, "tx1 deposit gas used")
+
+    const tx2 = await market.connect(user0).deposit(bearToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx2, "tx2 deposit gas used")
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1200))
+
+    const tx3 = await market.connect(user1).deposit(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx3, "tx3 deposit gas used")
   })
 
 })
