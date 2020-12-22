@@ -53,23 +53,30 @@ describe("X2ETHMarket", function () {
     expect(await bearToken.market()).eq(market.address)
   })
 
-  it("deposit", async () => {
-    const tx0 = await market.connect(user0).deposit(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
-    await reportGasUsed(provider, tx0, "tx0 deposit gas used")
+  it("gas usage", async () => {
+    const tx0 = await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx0, "tx0 buy gas used")
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
 
-    const tx1 = await market.connect(user0).deposit(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
-    await reportGasUsed(provider, tx1, "tx1 deposit gas used")
+    const tx1 = await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx1, "tx1 buy gas used")
 
-    const tx2 = await market.connect(user0).deposit(bearToken.address, user0.address, { value: expandDecimals(10, 18) })
-    await reportGasUsed(provider, tx2, "tx2 deposit gas used")
+    const tx2 = await market.connect(user0).buy(bearToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx2, "tx2 buy gas used")
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(1200))
 
-    const tx3 = await market.connect(user1).deposit(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
-    await reportGasUsed(provider, tx3, "tx3 deposit gas used")
-  })
+    const tx3 = await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx3, "tx3 buy gas used")
 
+    const tx4 = await market.connect(user0).sell(bullToken.address, expandDecimals(1, 18), user0.address)
+    await reportGasUsed(provider, tx4, "tx4 sell gas used")
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1300))
+
+    const tx5 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
+    await reportGasUsed(provider, tx5, "tx5 sell gas used")
+  })
 })

@@ -77,7 +77,7 @@ contract X2ETHMarket is ReentrancyGuard {
         cachedBearDivisor = INITIAL_REBASE_DIVISOR;
     }
 
-    function deposit(address _token, address _receiver) public payable nonReentrant returns (uint256) {
+    function buy(address _token, address _receiver) public payable nonReentrant returns (uint256) {
         bool isBull = _token == bullToken;
         require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
         uint256 amount = msg.value;
@@ -92,7 +92,7 @@ contract X2ETHMarket is ReentrancyGuard {
         return depositAmount;
     }
 
-    function withdraw(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
+    function sell(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
         require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
         rebase();
 
