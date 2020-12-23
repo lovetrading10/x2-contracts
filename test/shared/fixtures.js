@@ -40,8 +40,34 @@ async function loadFixtures(provider, wallet) {
   return { weth, feeToken, feeReceiver, factory, router, priceFeed, market, bullToken, bearToken }
 }
 
+async function loadETHFixtures(provider, wallet) {
+  const weth = await deployContract("WETH", [])
+  const feeReceiver = await deployContract("X2FeeReceiver", [])
+  const factory = await deployContract("X2ETHFactory", [weth.address])
+
+  const priceFeed = await deployContract("MockPriceFeed", [])
+  await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
+
+  const tx = await factory.createETHMarket(
+      "X2:3XBULL:ETH/USD",
+      "X2:3XBEAR:ETH/USD",
+      priceFeed.address,
+      30000, // multiplierBasisPoints, 300%
+      9000 // maxProfitBasisPoints, 90%
+  )
+  // reportGasUsed(provider, tx, "createETHMarket gas used")
+
+  const marketAddress = await factory.markets(0)
+  const market = await contractAt("X2ETHMarket", marketAddress)
+  const bullToken = await contractAt("X2Token", await market.bullToken())
+  const bearToken = await contractAt("X2Token", await market.bearToken())
+
+  return { weth, feeReceiver, factory, priceFeed, market, bullToken, bearToken }
+}
+
 module.exports = {
   deployContract,
   contractAt,
-  loadFixtures
+  loadFixtures,
+  loadETHFixtures
 }

@@ -5,7 +5,7 @@ pragma solidity 0.6.12;
 import "./libraries/math/SafeMath.sol";
 import "./libraries/utils/ReentrancyGuard.sol";
 
-import "./interfaces/IX2Factory.sol";
+import "./interfaces/IX2ETHFactory.sol";
 import "./interfaces/IX2FeeReceiver.sol";
 import "./interfaces/IX2PriceFeed.sol";
 import "./interfaces/IX2Token.sol";
@@ -142,8 +142,18 @@ contract X2ETHMarket is ReentrancyGuard {
 
         // if there have been two price updates since the lastRound
         // then we can settle balances based on the lower of the
-        // last two values for bulls and higher of the last two values for bears
-
+        // last two values for bulls and the higher of the
+        // last two values for bears
+        {
+        uint80 _lastRound = lastRound;
+        if (_lastRound > lastRound + 1) {
+            (bool ok, uint256 p0, uint256 p1) = getPrices(_lastRound - 1, _lastRound);
+            if (ok) {
+                nextPrice = isBull ? (p0 < p1 ? p0 : p1) : (p0 < p1 ? p1 : p0);
+                return getRebaseDivisor(_lastPrice, nextPrice, isBull);
+            }
+        }
+        }
 
         // if the price has moved then on rebase the previousDivisor
         // will have the current cachedDivisor's value
@@ -164,6 +174,18 @@ contract X2ETHMarket is ReentrancyGuard {
             return previousDivisor;
         }
         return cachedDivisor > rebaseDivisor ? cachedDivisor : rebaseDivisor;
+    }
+
+    function getPrices(uint80 r0, uint80 r1) public view returns (bool, uint256, uint256) {
+        address _priceFeed = priceFeed;
+        (, int256 p0, , ,) = IX2PriceFeed(_priceFeed).getRoundData(r0);
+        (, int256 p1, , ,) = IX2PriceFeed(_priceFeed).getRoundData(r1);
+
+        if (p0 <= 0 || p1 <= 0) {
+            return (false, 0, 0);
+        }
+
+        return (true, uint256(p0), uint256(p1));
     }
 
     function latestPrice() public view returns (uint256) {
@@ -223,7 +245,7 @@ contract X2ETHMarket is ReentrancyGuard {
     }
 
     function _collectFees(uint256 _amount) private returns (uint256) {
-        uint256 fee = IX2Factory(factory).getFee(address(this), _amount);
+        uint256 fee = IX2ETHFactory(factory).getFee(address(this), _amount);
         if (fee == 0) { return 0; }
 
         feeReserve = feeReserve.add(fee);

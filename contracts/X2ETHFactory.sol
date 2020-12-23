@@ -5,11 +5,11 @@ pragma solidity 0.6.12;
 import "./libraries/math/SafeMath.sol";
 import "./libraries/token/SafeERC20.sol";
 
-import "./interfaces/IX2Factory.sol";
-import "./X2Market.sol";
+import "./interfaces/IX2ETHFactory.sol";
+import "./X2ETHMarket.sol";
 import "./X2Token.sol";
 
-contract X2Factory is IX2Factory {
+contract X2ETHFactory is IX2ETHFactory {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -18,7 +18,6 @@ contract X2Factory is IX2Factory {
 
     address public gov;
     address public override feeReceiver;
-    address public override feeToken;
     address public weth;
 
     address[] public markets;
@@ -45,8 +44,7 @@ contract X2Factory is IX2Factory {
         _;
     }
 
-    constructor(address _feeToken, address _weth) public {
-        feeToken = _feeToken;
+    constructor(address _weth) public {
         weth = _weth;
         gov = msg.sender;
     }
@@ -59,29 +57,23 @@ contract X2Factory is IX2Factory {
         freeMarketCreation = true;
     }
 
-    function createMarket(
+    function createETHMarket(
         string memory _bullTokenSymbol,
         string memory _bearTokenSymbol,
-        address _collateralToken,
         address _priceFeed,
         uint256 _multiplierBasisPoints,
-        uint256 _maxProfitBasisPoints,
-        uint256 _minDeltaBasisPoints
+        uint256 _maxProfitBasisPoints
     ) external returns (address, address, address) {
         if (!freeMarketCreation) {
             require(msg.sender == gov, "X2Factory: forbidden");
         }
 
-        X2Market market = new X2Market();
+        X2ETHMarket market = new X2ETHMarket();
         market.initialize(
             address(this),
-            weth,
-            _collateralToken,
-            feeToken,
             _priceFeed,
             _multiplierBasisPoints,
-            _maxProfitBasisPoints,
-            _minDeltaBasisPoints
+            _maxProfitBasisPoints
         );
 
         X2Token bullToken = new X2Token();
@@ -98,7 +90,7 @@ contract X2Factory is IX2Factory {
         emit CreateMarket(
             _bullTokenSymbol,
             _bearTokenSymbol,
-            _collateralToken,
+            address(0),
             _priceFeed,
             _multiplierBasisPoints,
             _maxProfitBasisPoints,

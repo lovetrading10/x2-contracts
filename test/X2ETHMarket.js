@@ -1,6 +1,6 @@
 const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
-const { loadFixtures, contractAt } = require("./shared/fixtures")
+const { loadETHFixtures, contractAt } = require("./shared/fixtures")
 const { maxUint256, expandDecimals, reportGasUsed, increaseTime, mineBlock } = require("./shared/utilities")
 const { toChainlinkPrice } = require("./shared/chainlink")
 
@@ -18,24 +18,14 @@ describe("X2ETHMarket", function () {
   let bearToken
 
   beforeEach(async () => {
-    const fixtures = await loadFixtures(provider, wallet)
+    const fixtures = await loadETHFixtures(provider, wallet)
     weth = fixtures.weth
     factory = fixtures.factory
     router = fixtures.router
     priceFeed = fixtures.priceFeed
-
-    await factory.createETHMarket(
-      "X2:3XBULL:ETH/USD",
-      "X2:3XBEAR:ETH/USD",
-      priceFeed.address,
-      30000, // multiplierBasisPoints, 300%
-      9000 // maxProfitBasisPoints, 90%
-    )
-
-    const marketAddress = await factory.markets(1)
-    market = await contractAt("X2ETHMarket", marketAddress)
-    bullToken = await contractAt("X2Token", await market.bullToken())
-    bearToken = await contractAt("X2Token", await market.bearToken())
+    market = fixtures.market
+    bullToken = fixtures.bullToken
+    bearToken = fixtures.bearToken
   })
 
   it("inits", async () => {
