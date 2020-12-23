@@ -34,10 +34,8 @@ describe("X2ETHMarket", function () {
     expect(await market.multiplierBasisPoints()).eq(30000)
     expect(await market.maxProfitBasisPoints()).eq(9000)
 
-    expect(await market.previousBullDivisor()).eq("10000000000")
-    expect(await market.previousBearDivisor()).eq("10000000000")
-    expect(await market.cachedBullDivisor()).eq("10000000000")
-    expect(await market.cachedBearDivisor()).eq("10000000000")
+    expect(await market.cachedBullDivisor()).eq("100000000000000000000")
+    expect(await market.cachedBearDivisor()).eq("100000000000000000000")
 
     expect(await bullToken.market()).eq(market.address)
     expect(await bearToken.market()).eq(market.address)
@@ -68,5 +66,11 @@ describe("X2ETHMarket", function () {
 
     const tx5 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
     await reportGasUsed(provider, tx5, "tx5 sell gas used")
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1400))
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1500))
+
+    const tx6 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
+    await reportGasUsed(provider, tx6, "tx6 sell gas used")
   })
 })

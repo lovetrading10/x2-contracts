@@ -14,17 +14,17 @@ contract X2ETHMarket is ReentrancyGuard {
     using SafeMath for uint256;
 
     // use a single storage slot
-    uint64 public previousBullDivisor;
-    uint64 public previousBearDivisor;
-    uint64 public cachedBullDivisor;
-    uint64 public cachedBearDivisor;
+    // max uint128 has 38 digits so it can support the INITIAL_REBASE_DIVISOR
+    // increasing by 10^18 times
+    uint128 public cachedBullDivisor;
+    uint128 public cachedBearDivisor;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
     // max uint256 has 77 digits, with an initial rebase divisor of 10^20
     // and assuming 18 decimals for tokens, collateral tokens with a supply
     // of up to 39 digits can be supported
-    uint64 public constant INITIAL_REBASE_DIVISOR = 10**10;
-    uint256 public constant MAX_DIVISOR = uint64(-1);
+    uint128 public constant INITIAL_REBASE_DIVISOR = 10**20;
+    uint256 public constant MAX_DIVISOR = uint128(-1);
 
     address public factory;
 
@@ -69,14 +69,12 @@ contract X2ETHMarket is ReentrancyGuard {
     function setBullToken(address _bullToken) public onlyFactory {
         require(bullToken == address(0), "X2ETHMarket: bullToken already set");
         bullToken = _bullToken;
-        previousBullDivisor = INITIAL_REBASE_DIVISOR;
         cachedBullDivisor = INITIAL_REBASE_DIVISOR;
     }
 
     function setBearToken(address _bearToken) public onlyFactory {
         require(bearToken == address(0), "X2ETHMarket: bearToken already set");
         bearToken = _bearToken;
-        previousBearDivisor = INITIAL_REBASE_DIVISOR;
         cachedBearDivisor = INITIAL_REBASE_DIVISOR;
     }
 
@@ -114,20 +112,14 @@ contract X2ETHMarket is ReentrancyGuard {
         uint256 nextPrice = latestPrice();
         if (nextPrice == _lastPrice) { return false; }
 
-        // store the divisor values as updating cachedDivisors will change the
-        // value returned from getRebaseDivisor
-        uint256 bullDivisor = getRebaseDivisor(_lastPrice, nextPrice, true);
-        uint256 bearDivisor = getRebaseDivisor(_lastPrice, nextPrice, false);
+        (uint256 bullDivisor, uint256 bearDivisor) = getDivisors(lastPrice, nextPrice);
 
         if (bullDivisor > MAX_DIVISOR || bearDivisor > MAX_DIVISOR) {
             return false;
         }
 
-        previousBullDivisor = cachedBullDivisor;
-        previousBearDivisor = cachedBearDivisor;
-
-        cachedBullDivisor = uint64(bullDivisor);
-        cachedBearDivisor = uint64(bearDivisor);
+        cachedBullDivisor = uint128(bullDivisor);
+        cachedBearDivisor = uint128(bearDivisor);
 
         lastPrice = nextPrice;
         lastRound = latestRound();
@@ -137,43 +129,21 @@ contract X2ETHMarket is ReentrancyGuard {
 
     function getDivisor(address _token) public view returns (uint256) {
         uint256 _lastPrice = lastPrice;
-        uint256 nextPrice = latestPrice();
+        uint80 _latestRound = latestRound();
         bool isBull = _token == bullToken;
 
-        // if there have been two price updates since the lastRound
-        // then we can settle balances based on the lower of the
-        // last two values for bulls and the higher of the
-        // last two values for bears
-        {
-        uint80 _lastRound = lastRound;
-        if (_lastRound > lastRound + 1) {
-            (bool ok, uint256 p0, uint256 p1) = getPrices(_lastRound - 1, _lastRound);
-            if (ok) {
-                nextPrice = isBull ? (p0 < p1 ? p0 : p1) : (p0 < p1 ? p1 : p0);
-                return getRebaseDivisor(_lastPrice, nextPrice, isBull);
-            }
-        }
+        (bool ok, uint256 p0, uint256 p1) = getPrices(_latestRound - 1, _latestRound);
+        if (!ok) {
+            return isBull ? cachedBullDivisor : cachedBearDivisor;
         }
 
-        // if the price has moved then on rebase the previousDivisor
-        // will have the current cachedDivisor's value
-        // and the cachedDivisor will have the rebaseDivisor's value
-        // so we should only compare these two values for this case
-        if (nextPrice != _lastPrice) {
-            uint256 cachedDivisor = isBull ? cachedBullDivisor : cachedBearDivisor;
-            uint256 rebaseDivisor = getRebaseDivisor(_lastPrice, nextPrice, isBull);
-            // return the largest divisor to prevent manipulation
-            return cachedDivisor > rebaseDivisor ? cachedDivisor : rebaseDivisor;
+        if (isBull) {
+            (uint256 bullDivisor,) = getDivisors(_lastPrice, p0 < p1 ? p0 : p1);
+            return bullDivisor;
         }
 
-        uint256 previousDivisor = isBull ? previousBullDivisor : previousBearDivisor;
-        uint256 cachedDivisor = isBull ? cachedBullDivisor : cachedBearDivisor;
-        uint256 rebaseDivisor = getRebaseDivisor(_lastPrice, nextPrice, isBull);
-        // return the largest divisor to prevent manipulation
-        if (previousDivisor > cachedDivisor && previousDivisor > rebaseDivisor) {
-            return previousDivisor;
-        }
-        return cachedDivisor > rebaseDivisor ? cachedDivisor : rebaseDivisor;
+        (, uint256 bearDivisor) = getDivisors(_lastPrice, p0 < p1 ? p1 : p0);
+        return bearDivisor;
     }
 
     function getPrices(uint80 r0, uint80 r1) public view returns (bool, uint256, uint256) {
@@ -198,17 +168,17 @@ contract X2ETHMarket is ReentrancyGuard {
         return IX2PriceFeed(priceFeed).latestRound();
     }
 
-    function getRebaseDivisor(uint256 _lastPrice, uint256 _nextPrice, bool _isBull) public view returns (uint256) {
+    function getDivisors(uint256 _lastPrice, uint256 _nextPrice) public view returns (uint256, uint256) {
         if (_nextPrice == _lastPrice) {
-            return _isBull ? cachedBullDivisor : cachedBearDivisor;
+            return (cachedBullDivisor, cachedBearDivisor);
         }
 
         uint256 bullRefSupply = IX2Token(bullToken)._totalSupply();
         uint256 bearRefSupply = IX2Token(bearToken)._totalSupply();
+
+        // these are the actual underlying supplies
         uint256 totalBulls = bullRefSupply.div(cachedBullDivisor);
         uint256 totalBears = bearRefSupply.div(cachedBearDivisor);
-
-        uint256 profit;
 
         // scope variables to avoid stack too deep errors
         {
@@ -216,30 +186,27 @@ contract X2ETHMarket is ReentrancyGuard {
         uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
         uint256 delta = _nextPrice > _lastPrice ? _nextPrice.sub(_lastPrice) : _lastPrice.sub(_nextPrice);
         // profit is [(smaller supply) * (change in price) / (last price)] * multiplierBasisPoints
-        profit = refSupply.mul(delta).div(_lastPrice).mul(multiplierBasisPoints).div(BASIS_POINTS_DIVISOR);
+        uint256 profit = refSupply.mul(delta).div(_lastPrice).mul(multiplierBasisPoints).div(BASIS_POINTS_DIVISOR);
 
         // cap the profit to the (max profit percentage) of the smaller supply
         uint256 maxProfit = refSupply.mul(maxProfitBasisPoints).div(BASIS_POINTS_DIVISOR);
         if (profit > maxProfit) { profit = maxProfit; }
+
+        totalBulls = _nextPrice > _lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
+        totalBears = _nextPrice > _lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
         }
 
-        if (_isBull) {
-            uint256 nextSupply = _nextPrice > _lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
-            return _getNextDivisor(bullRefSupply, nextSupply, _isBull);
-        }
-
-        uint256 nextSupply = _nextPrice > _lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
-        return _getNextDivisor(bearRefSupply, nextSupply, _isBull);
+        return (_getNextDivisor(bullRefSupply, totalBulls, cachedBullDivisor), _getNextDivisor(bearRefSupply, totalBears, cachedBearDivisor));
     }
 
-    function _getNextDivisor(uint256 _refSupply, uint256 _nextSupply, bool _isBull) private view returns (uint256) {
+    function _getNextDivisor(uint256 _refSupply, uint256 _nextSupply, uint256 _fallbackDivisor) private pure returns (uint256) {
         if (_nextSupply == 0) {
             return INITIAL_REBASE_DIVISOR;
         }
 
         uint256 divisor = _refSupply.div(_nextSupply);
         // prevent the cachedDivisor from being set to 0
-        if (divisor == 0) { return _isBull ? cachedBullDivisor : cachedBearDivisor; }
+        if (divisor == 0) { return _fallbackDivisor; }
 
         return divisor;
     }
