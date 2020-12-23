@@ -14,17 +14,24 @@ contract X2ETHMarket is ReentrancyGuard {
     using SafeMath for uint256;
 
     // use a single storage slot
-    // max uint128 has 38 digits so it can support the INITIAL_REBASE_DIVISOR
-    // increasing by 10^18 times
-    uint128 public cachedBullDivisor;
-    uint128 public cachedBearDivisor;
+    // max uint64 has 19 digits so it can support the INITIAL_REBASE_DIVISOR
+    // increasing by 10^9 times
+    uint64 public previousBullDivisor;
+    uint64 public previousBearDivisor;
+    uint64 public cachedBullDivisor;
+    uint64 public cachedBearDivisor;
+
+    // use a single store slot
+    uint176 public lastPrice;
+    uint80 public lastRound;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
     // max uint256 has 77 digits, with an initial rebase divisor of 10^20
     // and assuming 18 decimals for tokens, collateral tokens with a supply
     // of up to 39 digits can be supported
-    uint128 public constant INITIAL_REBASE_DIVISOR = 10**20;
-    uint256 public constant MAX_DIVISOR = uint128(-1);
+    uint64 public constant INITIAL_REBASE_DIVISOR = 10**10;
+    uint256 public constant MAX_DIVISOR = uint64(-1);
+    int256 public constant MAX_PRICE = uint176(-1);
 
     address public factory;
 
@@ -34,8 +41,6 @@ contract X2ETHMarket is ReentrancyGuard {
     address public priceFeed;
     uint256 public multiplierBasisPoints;
     uint256 public maxProfitBasisPoints;
-    uint256 public lastPrice;
-    uint80 public lastRound;
 
     uint256 public feeReserve;
 
@@ -60,22 +65,22 @@ contract X2ETHMarket is ReentrancyGuard {
         multiplierBasisPoints = _multiplierBasisPoints;
         maxProfitBasisPoints = _maxProfitBasisPoints;
 
-        lastPrice = latestPrice();
+        lastPrice = uint176(latestPrice());
         require(lastPrice != 0, "X2ETHMarket: unsupported price feed");
-
-        lastRound = latestRound();
     }
 
     function setBullToken(address _bullToken) public onlyFactory {
         require(bullToken == address(0), "X2ETHMarket: bullToken already set");
         bullToken = _bullToken;
         cachedBullDivisor = INITIAL_REBASE_DIVISOR;
+        previousBullDivisor = INITIAL_REBASE_DIVISOR;
     }
 
     function setBearToken(address _bearToken) public onlyFactory {
         require(bearToken == address(0), "X2ETHMarket: bearToken already set");
         bearToken = _bearToken;
         cachedBearDivisor = INITIAL_REBASE_DIVISOR;
+        previousBearDivisor = INITIAL_REBASE_DIVISOR;
     }
 
     function buy(address _token, address _receiver) public payable nonReentrant returns (uint256) {
@@ -108,42 +113,96 @@ contract X2ETHMarket is ReentrancyGuard {
     }
 
     function rebase() public returns (bool) {
-        uint256 _lastPrice = lastPrice;
         uint256 nextPrice = latestPrice();
-        if (nextPrice == _lastPrice) { return false; }
+        uint80 _latestRound = latestRound();
+        if (_latestRound == lastRound) { return false; }
 
-        (uint256 bullDivisor, uint256 bearDivisor) = getDivisors(lastPrice, nextPrice);
+        (uint256 _cachedBullDivisor, uint256 _cachedBearDivisor) = getDivisors(uint256(lastPrice), nextPrice);
 
-        if (bullDivisor > MAX_DIVISOR || bearDivisor > MAX_DIVISOR) {
+        if (_cachedBullDivisor > MAX_DIVISOR || _cachedBearDivisor > MAX_DIVISOR) {
             return false;
         }
 
-        cachedBullDivisor = uint128(bullDivisor);
-        cachedBearDivisor = uint128(bearDivisor);
+        if (_latestRound == lastRound + 1) {
+            lastPrice = uint176(nextPrice);
+            lastRound = _latestRound;
+            previousBullDivisor = cachedBullDivisor;
+            previousBearDivisor = cachedBearDivisor;
+            cachedBullDivisor = uint64(_cachedBullDivisor);
+            cachedBearDivisor = uint64(_cachedBearDivisor);
+            return true;
+        }
 
-        lastPrice = nextPrice;
-        lastRound = latestRound();
+        (bool ok, uint256 previousPrice) = getRoundPrice(_latestRound - 1);
+        if (!ok) {
+            return false;
+        }
+
+        (uint256 _previousBullDivisor, uint256 _previousBearDivisor) = getDivisors(uint256(lastPrice), previousPrice);
+
+        lastPrice = uint176(nextPrice);
+        lastRound = _latestRound;
+        previousBullDivisor = uint64(_previousBullDivisor);
+        previousBearDivisor = uint64(_previousBearDivisor);
+        cachedBullDivisor = uint64(_cachedBullDivisor);
+        cachedBearDivisor = uint64(_cachedBearDivisor);
 
         return true;
     }
 
     function getDivisor(address _token) public view returns (uint256) {
-        uint256 _lastPrice = lastPrice;
+        uint80 _lastRound = lastRound;
         uint80 _latestRound = latestRound();
         bool isBull = _token == bullToken;
 
-        (bool ok, uint256 p0, uint256 p1) = getPrices(_latestRound - 1, _latestRound);
+        // return the larger divisor to avoid manipulation
+        if (_latestRound == _lastRound) {
+            if (isBull) {
+                uint256 _cachedBullDivisor = uint256(cachedBullDivisor);
+                uint256 _previousBullDivisor = uint256(previousBullDivisor);
+                return _cachedBullDivisor > _previousBullDivisor ? _cachedBullDivisor : _previousBullDivisor;
+            }
+            uint256 _cachedBearDivisor = uint256(cachedBearDivisor);
+            uint256 _previousBearDivisor = uint256(previousBearDivisor);
+            return _cachedBearDivisor > _previousBearDivisor ? _cachedBearDivisor : _previousBearDivisor;
+        }
+
+        uint256 _lastPrice = uint256(lastPrice);
+        uint256 nextPrice = latestPrice();
+        if (_latestRound == _lastRound + 1) {
+            if (isBull) {
+                uint256 _cachedBullDivisor = uint256(cachedBullDivisor);
+                (uint256 nextBullDivisor,) = getDivisors(_lastPrice, nextPrice);
+                return _cachedBullDivisor > nextBullDivisor ? _cachedBullDivisor : nextBullDivisor;
+            }
+
+            uint256 _cachedBearDivisor = uint256(cachedBearDivisor);
+            (,uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
+            return _cachedBearDivisor > nextBearDivisor ? _cachedBearDivisor : nextBearDivisor;
+        }
+
+        (bool ok, uint256 previousPrice) = getRoundPrice(_latestRound - 1);
         if (!ok) {
-            return isBull ? cachedBullDivisor : cachedBearDivisor;
+            if (isBull) {
+                uint256 _cachedBullDivisor = uint256(cachedBullDivisor);
+                (uint256 nextBullDivisor,) = getDivisors(_lastPrice, nextPrice);
+                return _cachedBullDivisor > nextBullDivisor ? _cachedBullDivisor : nextBullDivisor;
+            }
+
+            uint256 _cachedBearDivisor = uint256(cachedBearDivisor);
+            (,uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
+            return _cachedBearDivisor > nextBearDivisor ? _cachedBearDivisor : nextBearDivisor;
         }
 
         if (isBull) {
-            (uint256 bullDivisor,) = getDivisors(_lastPrice, p0 < p1 ? p0 : p1);
-            return bullDivisor;
+            (uint256 _previousBullDivisor,) = getDivisors(_lastPrice, previousPrice);
+            (uint256 nextBullDivisor,) = getDivisors(_lastPrice, nextPrice);
+            return nextBullDivisor > _previousBullDivisor ? nextBullDivisor : _previousBullDivisor;
         }
 
-        (, uint256 bearDivisor) = getDivisors(_lastPrice, p0 < p1 ? p1 : p0);
-        return bearDivisor;
+        (, uint256 _previousBearDivisor) = getDivisors(_lastPrice, previousPrice);
+        (, uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
+        return nextBearDivisor > _previousBearDivisor ? nextBearDivisor : _previousBearDivisor;
     }
 
     function getPrices(uint80 r0, uint80 r1) public view returns (bool, uint256, uint256) {
@@ -151,17 +210,30 @@ contract X2ETHMarket is ReentrancyGuard {
         (, int256 p0, , ,) = IX2PriceFeed(_priceFeed).getRoundData(r0);
         (, int256 p1, , ,) = IX2PriceFeed(_priceFeed).getRoundData(r1);
 
-        if (p0 <= 0 || p1 <= 0) {
+        if (p0 <= 0 || p0 > MAX_PRICE || p1 <= 0 || p1 > MAX_PRICE) {
             return (false, 0, 0);
         }
 
         return (true, uint256(p0), uint256(p1));
     }
 
+    function getRoundPrice(uint80 round) public view returns (bool, uint256) {
+        address _priceFeed = priceFeed;
+        (, int256 price, , ,) = IX2PriceFeed(_priceFeed).getRoundData(round);
+        if (price <= 0 || price > MAX_PRICE) {
+            return (false, 0);
+        }
+
+        return (true, uint256(price));
+    }
+
     function latestPrice() public view returns (uint256) {
         int256 answer = IX2PriceFeed(priceFeed).latestAnswer();
-        // prevent zero or negative values from being returned
-        return answer > 0 ? uint256(answer) : lastPrice;
+        // avoid negative, zero or overflow values being returned
+        if (answer <= 0 || answer > MAX_PRICE) {
+            return uint256(lastPrice);
+        }
+        return uint256(answer);
     }
 
     function latestRound() public view returns (uint80) {

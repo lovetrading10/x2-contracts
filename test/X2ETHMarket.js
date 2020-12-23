@@ -34,8 +34,8 @@ describe("X2ETHMarket", function () {
     expect(await market.multiplierBasisPoints()).eq(30000)
     expect(await market.maxProfitBasisPoints()).eq(9000)
 
-    expect(await market.cachedBullDivisor()).eq("100000000000000000000")
-    expect(await market.cachedBearDivisor()).eq("100000000000000000000")
+    expect(await market.cachedBullDivisor()).eq("10000000000")
+    expect(await market.cachedBearDivisor()).eq("10000000000")
 
     expect(await bullToken.market()).eq(market.address)
     expect(await bearToken.market()).eq(market.address)
@@ -72,5 +72,36 @@ describe("X2ETHMarket", function () {
 
     const tx6 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
     await reportGasUsed(provider, tx6, "tx6 sell gas used")
+  })
+
+  it("buy", async () =>{
+    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+
+    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
+  })
+
+  it("rebases", async () =>{
+    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+    expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+
+    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
+    expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+
+    // expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+    // expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+    // expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(7, 18))
+    // expect(await bearToken.totalSupply()).eq(expandDecimals(7, 18))
+    console.log("bull", (await bullToken.totalSupply()).toString(), (await bullToken.balanceOf(user0.address)).toString())
+    console.log("bear", (await bearToken.totalSupply()).toString(), (await bearToken.balanceOf(user1.address)).toString())
+
+    await market.rebase()
+    console.log("bull", (await bullToken.totalSupply()).toString(), (await bullToken.balanceOf(user0.address)).toString())
+    console.log("bear", (await bearToken.totalSupply()).toString(), (await bearToken.balanceOf(user1.address)).toString())
   })
 })
