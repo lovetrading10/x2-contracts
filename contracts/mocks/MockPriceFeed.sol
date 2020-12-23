@@ -5,17 +5,28 @@ pragma solidity 0.6.12;
 import "../interfaces/IX2PriceFeed.sol";
 
 contract MockPriceFeed is IX2PriceFeed {
-    uint256 answer;
+    int256 answer;
+    uint80 roundId;
+    mapping (uint80 => int256) answers;
 
-    function latestAnswer() public override view returns (uint256) {
+    function latestAnswer() public override view returns (int256) {
         return answer;
     }
 
-    function latestTimestamp() public override view returns (uint256) {
-        return block.timestamp;
+    function latestRound() public override view returns (uint80) {
+        return roundId;
     }
 
-    function setLatestAnswer(uint256 _answer) public {
+    function setLatestAnswer(int256 _answer) public {
+        roundId = roundId + 1;
         answer = _answer;
+        answers[roundId] = _answer;
+    }
+
+    // returns roundId, answer, startedAt, updatedAt, answeredInRound
+    function getRoundData(uint80 _roundId) public override view
+        returns (uint80, int256, uint256, uint256, uint80)
+    {
+        return (_roundId, answers[_roundId], 0, 0, 0);
     }
 }

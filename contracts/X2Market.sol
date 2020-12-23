@@ -196,17 +196,18 @@ contract X2Market is IX2Market, ReentrancyGuard {
     }
 
     function latestPrice() public view override returns (uint256) {
-        uint256 answer = IX2PriceFeed(priceFeed).latestAnswer();
-        // prevent zero from being returned
-        if (answer == 0) { return lastPrice; }
+        int256 answer = IX2PriceFeed(priceFeed).latestAnswer();
+        if (answer <= 0) { return lastPrice; }
+
+        uint256 castedAnswer = uint256(answer);
 
         // prevent price from moving too often
         uint256 _lastPrice = lastPrice;
         uint256 minDelta = _lastPrice.mul(minDeltaBasisPoints).div(BASIS_POINTS_DIVISOR);
-        uint256 delta = answer > _lastPrice ? answer.sub(_lastPrice) : _lastPrice.sub(answer);
+        uint256 delta = castedAnswer > _lastPrice ? castedAnswer.sub(_lastPrice) : _lastPrice.sub(castedAnswer);
         if (delta <= minDelta) { return _lastPrice; }
 
-        return answer;
+        return castedAnswer;
     }
 
     function getDivisor(address _token) public override view returns (uint256) {

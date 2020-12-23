@@ -35,6 +35,7 @@ contract X2ETHMarket is ReentrancyGuard {
     uint256 public multiplierBasisPoints;
     uint256 public maxProfitBasisPoints;
     uint256 public lastPrice;
+    uint80 public lastRound;
 
     uint256 public feeReserve;
 
@@ -61,6 +62,8 @@ contract X2ETHMarket is ReentrancyGuard {
 
         lastPrice = latestPrice();
         require(lastPrice != 0, "X2ETHMarket: unsupported price feed");
+
+        lastRound = latestRound();
     }
 
     function setBullToken(address _bullToken) public onlyFactory {
@@ -107,13 +110,14 @@ contract X2ETHMarket is ReentrancyGuard {
     }
 
     function rebase() public returns (bool) {
+        uint256 _lastPrice = lastPrice;
         uint256 nextPrice = latestPrice();
-        if (nextPrice == lastPrice) { return false; }
+        if (nextPrice == _lastPrice) { return false; }
 
         // store the divisor values as updating cachedDivisors will change the
         // value returned from getRebaseDivisor
-        uint256 bullDivisor = getRebaseDivisor(true);
-        uint256 bearDivisor = getRebaseDivisor(false);
+        uint256 bullDivisor = getRebaseDivisor(_lastPrice, nextPrice, true);
+        uint256 bearDivisor = getRebaseDivisor(_lastPrice, nextPrice, false);
 
         if (bullDivisor > MAX_DIVISOR || bearDivisor > MAX_DIVISOR) {
             return false;
@@ -126,28 +130,35 @@ contract X2ETHMarket is ReentrancyGuard {
         cachedBearDivisor = uint64(bearDivisor);
 
         lastPrice = nextPrice;
+        lastRound = latestRound();
 
         return true;
     }
 
     function getDivisor(address _token) public view returns (uint256) {
+        uint256 _lastPrice = lastPrice;
         uint256 nextPrice = latestPrice();
         bool isBull = _token == bullToken;
+
+        // if there have been two price updates since the lastRound
+        // then we can settle balances based on the lower of the
+        // last two values for bulls and higher of the last two values for bears
+
 
         // if the price has moved then on rebase the previousDivisor
         // will have the current cachedDivisor's value
         // and the cachedDivisor will have the rebaseDivisor's value
         // so we should only compare these two values for this case
-        if (nextPrice != lastPrice) {
+        if (nextPrice != _lastPrice) {
             uint256 cachedDivisor = isBull ? cachedBullDivisor : cachedBearDivisor;
-            uint256 rebaseDivisor = getRebaseDivisor(isBull);
+            uint256 rebaseDivisor = getRebaseDivisor(_lastPrice, nextPrice, isBull);
             // return the largest divisor to prevent manipulation
             return cachedDivisor > rebaseDivisor ? cachedDivisor : rebaseDivisor;
         }
 
         uint256 previousDivisor = isBull ? previousBullDivisor : previousBearDivisor;
         uint256 cachedDivisor = isBull ? cachedBullDivisor : cachedBearDivisor;
-        uint256 rebaseDivisor = getRebaseDivisor(isBull);
+        uint256 rebaseDivisor = getRebaseDivisor(_lastPrice, nextPrice, isBull);
         // return the largest divisor to prevent manipulation
         if (previousDivisor > cachedDivisor && previousDivisor > rebaseDivisor) {
             return previousDivisor;
@@ -156,33 +167,32 @@ contract X2ETHMarket is ReentrancyGuard {
     }
 
     function latestPrice() public view returns (uint256) {
-        uint256 answer = IX2PriceFeed(priceFeed).latestAnswer();
-        // prevent zero from being returned
-        return answer == 0 ? lastPrice : answer;
+        int256 answer = IX2PriceFeed(priceFeed).latestAnswer();
+        // prevent zero or negative values from being returned
+        return answer > 0 ? uint256(answer) : lastPrice;
     }
 
-    function getRebaseDivisor(bool isBull) public view returns (uint256) {
-        address _bullToken = bullToken;
-        address _bearToken = bearToken;
+    function latestRound() public view returns (uint80) {
+        return IX2PriceFeed(priceFeed).latestRound();
+    }
 
-        uint256 _lastPrice = lastPrice;
-        uint256 nextPrice = latestPrice();
-
-        if (nextPrice == _lastPrice) {
-            return isBull ? cachedBullDivisor : cachedBearDivisor;
+    function getRebaseDivisor(uint256 _lastPrice, uint256 _nextPrice, bool _isBull) public view returns (uint256) {
+        if (_nextPrice == _lastPrice) {
+            return _isBull ? cachedBullDivisor : cachedBearDivisor;
         }
 
-        uint256 bullRefSupply = IX2Token(_bullToken)._totalSupply();
-        uint256 bearRefSupply = IX2Token(_bearToken)._totalSupply();
+        uint256 bullRefSupply = IX2Token(bullToken)._totalSupply();
+        uint256 bearRefSupply = IX2Token(bearToken)._totalSupply();
         uint256 totalBulls = bullRefSupply.div(cachedBullDivisor);
         uint256 totalBears = bearRefSupply.div(cachedBearDivisor);
 
         uint256 profit;
 
+        // scope variables to avoid stack too deep errors
         {
         // refSupply is the smaller of the two supplies
         uint256 refSupply = totalBulls < totalBears ? totalBulls : totalBears;
-        uint256 delta = nextPrice > _lastPrice ? nextPrice.sub(_lastPrice) : _lastPrice.sub(nextPrice);
+        uint256 delta = _nextPrice > _lastPrice ? _nextPrice.sub(_lastPrice) : _lastPrice.sub(_nextPrice);
         // profit is [(smaller supply) * (change in price) / (last price)] * multiplierBasisPoints
         profit = refSupply.mul(delta).div(_lastPrice).mul(multiplierBasisPoints).div(BASIS_POINTS_DIVISOR);
 
@@ -191,23 +201,23 @@ contract X2ETHMarket is ReentrancyGuard {
         if (profit > maxProfit) { profit = maxProfit; }
         }
 
-        if (isBull) {
-            uint256 nextSupply = nextPrice > _lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
-            return _getNextDivisor(bullRefSupply, nextSupply, isBull);
+        if (_isBull) {
+            uint256 nextSupply = _nextPrice > _lastPrice ? totalBulls.add(profit) : totalBulls.sub(profit);
+            return _getNextDivisor(bullRefSupply, nextSupply, _isBull);
         }
 
-        uint256 nextSupply = nextPrice > _lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
-        return _getNextDivisor(bearRefSupply, nextSupply, isBull);
+        uint256 nextSupply = _nextPrice > _lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
+        return _getNextDivisor(bearRefSupply, nextSupply, _isBull);
     }
 
-    function _getNextDivisor(uint256 _refSupply, uint256 _nextSupply, bool isBull) private view returns (uint256) {
+    function _getNextDivisor(uint256 _refSupply, uint256 _nextSupply, bool _isBull) private view returns (uint256) {
         if (_nextSupply == 0) {
             return INITIAL_REBASE_DIVISOR;
         }
 
         uint256 divisor = _refSupply.div(_nextSupply);
         // prevent the cachedDivisor from being set to 0
-        if (divisor == 0) { return isBull ? cachedBullDivisor : cachedBearDivisor; }
+        if (divisor == 0) { return _isBull ? cachedBullDivisor : cachedBearDivisor; }
 
         return divisor;
     }
