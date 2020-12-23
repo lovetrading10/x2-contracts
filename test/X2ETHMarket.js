@@ -59,19 +59,25 @@ describe("X2ETHMarket", function () {
     const tx3 = await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
     await reportGasUsed(provider, tx3, "tx3 buy gas used")
 
-    const tx4 = await market.connect(user0).sell(bullToken.address, expandDecimals(1, 18), user0.address)
-    await reportGasUsed(provider, tx4, "tx4 sell gas used")
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1200))
+
+    const tx4 = await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await reportGasUsed(provider, tx4, "tx4 buy gas used")
+
+    const tx5 = await market.connect(user0).sell(bullToken.address, expandDecimals(1, 18), user0.address)
+    await reportGasUsed(provider, tx5, "tx5 sell gas used")
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(1300))
 
-    const tx5 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
-    await reportGasUsed(provider, tx5, "tx5 sell gas used")
+    const tx6 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
+    await reportGasUsed(provider, tx6, "tx6 sell gas used")
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(1400))
     await priceFeed.setLatestAnswer(toChainlinkPrice(1500))
 
-    const tx6 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
-    await reportGasUsed(provider, tx6, "tx6 sell gas used")
+    const tx7 = await market.connect(user1).sell(bearToken.address, expandDecimals(1, 18), user1.address)
+    await reportGasUsed(provider, tx7, "tx7 sell gas used")
   })
 
   it("buy", async () =>{
@@ -101,6 +107,17 @@ describe("X2ETHMarket", function () {
     console.log("bear", (await bearToken.totalSupply()).toString(), (await bearToken.balanceOf(user1.address)).toString())
 
     await market.rebase()
+    console.log("bull", (await bullToken.totalSupply()).toString(), (await bullToken.balanceOf(user0.address)).toString())
+    console.log("bear", (await bearToken.totalSupply()).toString(), (await bearToken.balanceOf(user1.address)).toString())
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1200))
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1300))
+
+    console.log("bull", (await bullToken.totalSupply()).toString(), (await bullToken.balanceOf(user0.address)).toString())
+    console.log("bear", (await bearToken.totalSupply()).toString(), (await bearToken.balanceOf(user1.address)).toString())
+
+    await market.rebase()
+
     console.log("bull", (await bullToken.totalSupply()).toString(), (await bullToken.balanceOf(user0.address)).toString())
     console.log("bear", (await bearToken.totalSupply()).toString(), (await bearToken.balanceOf(user1.address)).toString())
   })
