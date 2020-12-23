@@ -139,6 +139,9 @@ contract X2ETHMarket is ReentrancyGuard {
         }
 
         (uint256 _previousBullDivisor, uint256 _previousBearDivisor) = getDivisors(uint256(lastPrice), previousPrice);
+        if (_previousBullDivisor > MAX_DIVISOR || _previousBearDivisor > MAX_DIVISOR) {
+            return false;
+        }
 
         lastPrice = uint176(nextPrice);
         lastRound = _latestRound;
