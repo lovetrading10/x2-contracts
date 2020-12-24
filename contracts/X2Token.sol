@@ -11,20 +11,35 @@ import "./interfaces/IX2Factory.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
 
+// farming code adapated from https://github.com/trusttoken/smart-contracts/blob/master/contracts/truefi/TrueFarm.sol
 contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+
+    uint256 constant PRECISION = 1e30;
 
     string public name;
     string public symbol;
     uint8 public constant decimals = 18;
 
+    // _totalSupply also tracks totalStaked
     uint256 public override _totalSupply;
 
     address public override market;
 
+    // balances track staked amount
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
+
+    // track overall cumulative rewards
+    uint256 public cumulativeRewardPerToken;
+    // track previous cumulated rewards for accounts
+    mapping(address => uint256) public previousCumulatedRewardPerToken;
+    // track claimable rewards for accounts
+    mapping(address => uint256) public claimableReward;
+    // track total rewards
+    uint256 public totalClaimedRewards;
+    uint256 public totalFarmRewards;
 
     bool public isInitialized;
 
@@ -123,6 +138,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     function _increaseBalance(address _account, uint256 _amount, uint256 _divisor) private {
         if (_amount == 0) { return; }
 
+        _updateFarm(_account);
         uint256 scaledAmount = _amount.mul(_divisor);
         balances[_account] = balances[_account].add(scaledAmount);
         _totalSupply = _totalSupply.add(scaledAmount);
@@ -131,8 +147,27 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     function _decreaseBalance(address _account, uint256 _amount, uint256 _divisor) private {
         if (_amount == 0) { return; }
 
+        _updateFarm(_account);
         uint256 scaledAmount = _amount.mul(_divisor);
         balances[_account] = balances[_account].sub(scaledAmount);
         _totalSupply = _totalSupply.sub(scaledAmount);
+    }
+
+    function _updateFarm(address _account) private {
+        IX2Market(market).distribute(address(this));
+        uint256 newTotalFarmRewards = address(this).balance.add(totalClaimedRewards).mul(PRECISION);
+        // calculate block reward
+        uint256 totalBlockReward = newTotalFarmRewards.sub(totalFarmRewards);
+        // update farm rewards
+        totalFarmRewards = newTotalFarmRewards;
+        // if there are stakers
+        if (_totalSupply > 0) {
+            cumulativeRewardPerToken = cumulativeRewardPerToken.add(totalBlockReward.div(_totalSupply));
+        }
+        claimableReward[_account] = claimableReward[_account].add(
+            balances[_account].mul(cumulativeRewardPerToken.sub(previousCumulatedRewardPerToken[_account])).div(PRECISION)
+        );
+        // update previous cumulative for sender
+        previousCumulatedRewardPerToken[_account] = cumulativeRewardPerToken;
     }
 }

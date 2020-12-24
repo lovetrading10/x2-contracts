@@ -12,4 +12,5 @@ interface IX2Market {
     function deposit(address token, address receiver, bool withFeeSubsidy) external returns (uint256);
     function withdraw(address token, uint256 amount, address receiver, bool withFeeSubsidy) external returns (uint256);
     function rebase() external returns (bool);
+    function distribute(address token) external pure returns (bool);
 }

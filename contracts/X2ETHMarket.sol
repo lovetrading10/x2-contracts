@@ -22,6 +22,7 @@ contract X2ETHMarket is ReentrancyGuard {
     uint64 public cachedBearDivisor;
 
     // use a single store slot
+    // max uint176 can store prices up to 52 digits
     uint176 public lastPrice;
     uint80 public lastRound;
 
@@ -153,6 +154,10 @@ contract X2ETHMarket is ReentrancyGuard {
         return true;
     }
 
+    function distribute(address /* _token */) public pure returns (bool) {
+        return true;
+    }
+
     function getDivisor(address _token) public view returns (uint256) {
         uint80 _lastRound = lastRound;
         uint80 _latestRound = latestRound();
@@ -279,7 +284,8 @@ contract X2ETHMarket is ReentrancyGuard {
             return INITIAL_REBASE_DIVISOR;
         }
 
-        uint256 divisor = _refSupply.div(_nextSupply);
+        // calculate and round up the divisor
+        uint256 divisor = _refSupply.mul(10).div(_nextSupply).add(9).div(10);
         // prevent the cachedDivisor from being set to 0
         if (divisor == 0) { return _fallbackDivisor; }
 

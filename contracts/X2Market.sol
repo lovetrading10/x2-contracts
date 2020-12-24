@@ -142,6 +142,10 @@ contract X2Market is IX2Market, ReentrancyGuard {
         return withdrawAmount;
     }
 
+    function distribute(address /* _token */) public pure override returns (bool) {
+        return true;
+    }
+
     function distributeFees() public nonReentrant {
         address feeReceiver = IX2Factory(factory).feeReceiver();
         require(feeReceiver != address(0), "X2Market: empty feeReceiver");
