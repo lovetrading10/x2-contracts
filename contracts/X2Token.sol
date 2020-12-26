@@ -83,8 +83,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _mint(_account, _amount, _divisor);
     }
 
-    function burn(address _account, uint256 _amount) public override onlyMarket {
-        _burn(_account, _amount);
+    function burn(address _account, uint256 _amount, bool _distribute) public override onlyMarket {
+        _burn(_account, _amount, _distribute);
     }
 
     function totalSupply() public view override returns (uint256) {
@@ -127,7 +127,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         require(_recipient != address(0), "X2Token: transfer to the zero address");
 
         uint256 divisor = getDivisor();
-        _decreaseBalance(_sender, _amount, divisor);
+        _decreaseBalance(_sender, _amount, divisor, true);
         _increaseBalance(_recipient, _amount, divisor);
 
         emit Transfer(_sender, _recipient, _amount);
@@ -141,11 +141,11 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         emit Transfer(address(0), _account, _amount);
     }
 
-    function _burn(address _account, uint256 _amount) private {
+    function _burn(address _account, uint256 _amount, bool _distribute) private {
         require(_account != address(0), "X2Token: burn from the zero address");
 
         uint256 divisor = getDivisor();
-        _decreaseBalance(_account, _amount, divisor);
+        _decreaseBalance(_account, _amount, divisor, _distribute);
 
         emit Transfer(_account, address(0), _amount);
     }
@@ -162,7 +162,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         if (_amount == 0) { return; }
 
         uint256 cachedTotalSupply = _totalSupply;
-        _updateFarm(_account, cachedTotalSupply);
+        _updateFarm(_account, cachedTotalSupply, true);
         uint256 scaledAmount = _amount.mul(_divisor);
         uint256 nextBalance = uint256(ledgers[_account].balance).add(scaledAmount);
         require(nextBalance < MAX_BALANCE, "X2Token: balance limit exceeded");
@@ -173,11 +173,11 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _totalSupply = cachedTotalSupply.add(scaledAmount);
     }
 
-    function _decreaseBalance(address _account, uint256 _amount, uint256 _divisor) private {
+    function _decreaseBalance(address _account, uint256 _amount, uint256 _divisor, bool _distribute) private {
         if (_amount == 0) { return; }
 
         uint256 cachedTotalSupply = _totalSupply;
-        _updateFarm(_account, cachedTotalSupply);
+        _updateFarm(_account, cachedTotalSupply, _distribute);
         uint256 scaledAmount = _amount.mul(_divisor);
         uint256 nextBalance = uint256(ledgers[_account].balance).sub(scaledAmount);
         ledgers[_account] = Ledger(
@@ -187,8 +187,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _totalSupply = cachedTotalSupply.sub(scaledAmount);
     }
 
-    function _updateFarm(address _account, uint256 cachedTotalSupply) private {
-        if (distributor != address(0)) {
+    function _updateFarm(address _account, uint256 _cachedTotalSupply, bool _distribute) private {
+        if (_distribute && distributor != address(0)) {
             IX2Distributor(distributor).distribute(address(this));
         }
 
@@ -201,7 +201,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         uint256 _cumulativeRewardPerToken = cumulativeRewardPerToken;
         // if there are stakers
         if (_totalSupply > 0) {
-            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(totalBlockReward.div(cachedTotalSupply));
+            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(totalBlockReward.div(_cachedTotalSupply));
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
         require(_cumulativeRewardPerToken < MAX_REWARD, "X2Token: cumulativeRewardPerToken limit exceeded");

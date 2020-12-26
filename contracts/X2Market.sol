@@ -125,7 +125,7 @@ contract X2Market is IX2Market, ReentrancyGuard {
         require(_token == bullToken || _token == bearToken, "X2Market: unsupported token");
         rebase();
 
-        IX2Token(_token).burn(msg.sender, _amount);
+        IX2Token(_token).burn(msg.sender, _amount, true);
 
         uint256 feeSubsidy = 0;
         if (_withFeeSubsidy && collateralToken == weth) {

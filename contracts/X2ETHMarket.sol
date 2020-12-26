@@ -103,7 +103,26 @@ contract X2ETHMarket is ReentrancyGuard {
         require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
         rebase();
 
-        IX2Token(_token).burn(msg.sender, _amount);
+        IX2Token(_token).burn(msg.sender, _amount, true);
+
+        uint256 fee = _collectFees(_amount);
+        uint256 withdrawAmount = _amount.sub(fee);
+        (bool success,) = _receiver.call{value: withdrawAmount}("");
+        require(success, "X2ETHMarket: eth transfer failed");
+
+        return withdrawAmount;
+    }
+
+    // since an X2Token's distributor can be set by the factory's gov,
+    // the market should allow an option to sell the token without invoking
+    // the distributor
+    // this ensures that tokens can always be sold even if the distributor
+    // is set to an address that intentionally fails when `distribute` is called
+    function sellWithoutDistribution(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
+        require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
+        rebase();
+
+        IX2Token(_token).burn(msg.sender, _amount, false);
 
         uint256 fee = _collectFees(_amount);
         uint256 withdrawAmount = _amount.sub(fee);

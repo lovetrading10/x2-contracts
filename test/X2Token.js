@@ -42,7 +42,7 @@ describe("X2Token", function () {
   })
 
   it("burn", async () => {
-    await expect(bullToken.burn(user0.address, 100))
+    await expect(bullToken.burn(user0.address, 100, true))
       .to.be.revertedWith("X2Token: forbidden")
   })
 
