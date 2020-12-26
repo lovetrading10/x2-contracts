@@ -6,6 +6,8 @@ import "./libraries/math/SafeMath.sol";
 import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2ETHFactory.sol";
+import "./interfaces/IX2Distributor.sol";
+
 import "./X2ETHMarket.sol";
 import "./X2Token.sol";
 
@@ -17,6 +19,7 @@ contract X2ETHFactory is IX2ETHFactory {
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
 
     address public gov;
+    address public distributor;
     address public override feeReceiver;
     address public weth;
 
@@ -57,6 +60,10 @@ contract X2ETHFactory is IX2ETHFactory {
         freeMarketCreation = true;
     }
 
+    function setDistributor(address _token, address _distributor) external onlyGov {
+        X2Token(_token).setDistributor(_distributor);
+    }
+
     function createETHMarket(
         string memory _bullTokenSymbol,
         string memory _bearTokenSymbol,
@@ -77,10 +84,10 @@ contract X2ETHFactory is IX2ETHFactory {
         );
 
         X2Token bullToken = new X2Token();
-        bullToken.initialize(address(market), _bullTokenSymbol);
+        bullToken.initialize(address(this), address(market), _bullTokenSymbol);
 
         X2Token bearToken = new X2Token();
-        bearToken.initialize(address(market), _bearTokenSymbol);
+        bearToken.initialize(address(this), address(market), _bearTokenSymbol);
 
         market.setBullToken(address(bullToken));
         market.setBearToken(address(bearToken));

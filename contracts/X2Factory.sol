@@ -85,10 +85,10 @@ contract X2Factory is IX2Factory {
         );
 
         X2Token bullToken = new X2Token();
-        bullToken.initialize(address(market), _bullTokenSymbol);
+        bullToken.initialize(address(this), address(market), _bullTokenSymbol);
 
         X2Token bearToken = new X2Token();
-        bearToken.initialize(address(market), _bearTokenSymbol);
+        bearToken.initialize(address(this), address(market), _bearTokenSymbol);
 
         market.setBullToken(address(bullToken));
         market.setBearToken(address(bearToken));

@@ -119,10 +119,10 @@ describe("X2Factory", function () {
       50 // minDeltaBasisPoints, 0.5%
     )).to.be.revertedWith("X2Market: already initialized")
 
-    await expect(bullToken.initialize(market.address, "X2:BULL"))
+    await expect(bullToken.initialize(factory.address, market.address, "X2:BULL"))
       .to.be.revertedWith("X2Token: already initialized")
 
-    await expect(bearToken.initialize(market.address, "X2:BEAR"))
+    await expect(bearToken.initialize(factory.address, market.address, "X2:BEAR"))
       .to.be.revertedWith("X2Token: already initialized")
   })
 

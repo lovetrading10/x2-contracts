@@ -39,7 +39,7 @@ describe("X2Router", function () {
 
   it("deposit", async () => {
     const token0 = await deployContract("X2Token", [])
-    await token0.initialize(market.address, "X2:BULL")
+    await token0.initialize(factory.address, market.address, "X2:BULL")
     await weth.connect(user0).deposit({ value: 100 })
     await weth.connect(user0).approve(router.address, 100)
     await expect(router.connect(user0).deposit(token0.address, 100, 0, user0.address, maxUint256))
@@ -101,7 +101,7 @@ describe("X2Router", function () {
       .to.be.revertedWith("X2Router: mismatched collateral")
 
     const token0 = await deployContract("X2Token", [])
-    token0.initialize(market.address, "X2:BULL")
+    token0.initialize(factory.address, market.address, "X2:BULL")
     await expect(router.connect(user0).depositETH(token0.address, 0, user0.address, maxUint256, { value: 100 }))
       .to.be.revertedWith("X2Market: unsupported token")
 
@@ -139,7 +139,7 @@ describe("X2Router", function () {
     await feeToken.connect(user0).approve(router.address, 1)
 
     const token0 = await deployContract("X2Token", [])
-    token0.initialize(market.address, "X2:BULL")
+    token0.initialize(factory.address, market.address, "X2:BULL")
     await weth.connect(user0).deposit({ value: 2000 })
     await weth.connect(user0).approve(router.address, 2000)
     await expect(router.connect(user0).deposit(token0.address, 2000, 1, user0.address, maxUint256))
@@ -171,7 +171,7 @@ describe("X2Router", function () {
     await feeToken.connect(user0).approve(router.address, 1)
 
     const token0 = await deployContract("X2Token", [])
-    token0.initialize(market.address, "X2:BULL")
+    token0.initialize(factory.address, market.address, "X2:BULL")
     await expect(router.connect(user0).depositETH(token0.address, 1, user0.address, maxUint256, { value: 2000 }))
       .to.be.revertedWith("X2Market: unsupported token")
 
@@ -205,12 +205,6 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(2000)
-
-    const token0 = await deployContract("X2Token", [])
-    await token0.initialize(market.address, "X2:BULL")
-    await token0.connect(user0).approve(router.address, 100)
-    await expect(router.connect(user0).withdraw(token0.address, 100, 0, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Market: unsupported token")
 
     await bullToken.connect(user0).approve(router.address, 2000)
     await router.connect(user0).withdraw(bullToken.address, 2000, 0, receiver0.address, maxUint256)
@@ -257,12 +251,6 @@ describe("X2Router", function () {
     expect(await weth.balanceOf(market.address)).eq(2000)
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await bullToken.balanceOf(user0.address)).eq(2000)
-
-    const token0 = await deployContract("X2Token", [])
-    await token0.initialize(market.address, "X2:BULL")
-    await token0.connect(user0).approve(router.address, 100)
-    await expect(router.connect(user0).withdraw(token0.address, 100, 0, receiver0.address, maxUint256))
-      .to.be.revertedWith("X2Market: unsupported token")
 
     await bullToken.connect(user0).approve(router.address, 2000)
     await router.connect(user0).withdraw(bullToken.address, 2000, 0, receiver0.address, maxUint256)

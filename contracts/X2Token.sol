@@ -7,9 +7,10 @@ import "./libraries/token/SafeERC20.sol";
 import "./libraries/math/SafeMath.sol";
 import "./libraries/utils/ReentrancyGuard.sol";
 
-import "./interfaces/IX2Factory.sol";
+import "./interfaces/IX2Distributor.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
+import "hardhat/console.sol";
 
 // farming code adapated from https://github.com/trusttoken/smart-contracts/blob/master/contracts/truefi/TrueFarm.sol
 contract X2Token is IERC20, IX2Token, ReentrancyGuard {
@@ -38,6 +39,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     uint256 public override _totalSupply;
 
     address public override market;
+    address public factory;
+    address public distributor;
 
     // ledgers track balances and costs
     mapping (address => Ledger) public ledgers;
@@ -53,17 +56,27 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
     bool public isInitialized;
 
+    modifier onlyFactory() {
+        require(msg.sender == factory, "X2Token: forbidden");
+        _;
+    }
+
     modifier onlyMarket() {
         require(msg.sender == market, "X2Token: forbidden");
         _;
     }
 
-    function initialize(address _market, string memory _symbol) public {
+    function initialize(address _factory, address _market, string memory _symbol) public {
         require(!isInitialized, "X2Token: already initialized");
         isInitialized = true;
+        factory = _factory;
         market = _market;
         name = _symbol;
         symbol = _symbol;
+    }
+
+    function setDistributor(address _distributor) external override onlyFactory {
+        distributor = _distributor;
     }
 
     function mint(address _account, uint256 _amount, uint256 _divisor) public override onlyMarket {
@@ -175,7 +188,10 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function _updateFarm(address _account, uint256 cachedTotalSupply) private {
-        IX2Market(market).distribute(address(this));
+        if (distributor != address(0)) {
+            IX2Distributor(distributor).distribute(address(this));
+        }
+
         uint256 newTotalFarmRewards = address(this).balance.add(totalClaimedRewards).mul(PRECISION);
         // calculate block reward
         uint256 totalBlockReward = newTotalFarmRewards.sub(totalFarmRewards);

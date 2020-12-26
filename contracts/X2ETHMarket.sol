@@ -21,15 +21,15 @@ contract X2ETHMarket is ReentrancyGuard {
     uint64 public cachedBullDivisor;
     uint64 public cachedBearDivisor;
 
-    // use a single store slot
+    // use a single storage slot
     // max uint176 can store prices up to 52 digits
     uint176 public lastPrice;
     uint80 public lastRound;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
-    // max uint256 has 77 digits, with an initial rebase divisor of 10^20
-    // and assuming 18 decimals for tokens, collateral tokens with a supply
-    // of up to 39 digits can be supported
+    // max uint128 has 38 digits, with an initial rebase divisor of 10^10
+    // and 18 decimals for ETH, collateral of up to 10 billion ETH
+    // can be supported
     uint64 public constant INITIAL_REBASE_DIVISOR = 10**10;
     uint256 public constant MAX_DIVISOR = uint64(-1);
     int256 public constant MAX_PRICE = uint176(-1);
@@ -151,10 +151,6 @@ contract X2ETHMarket is ReentrancyGuard {
         cachedBullDivisor = uint64(_cachedBullDivisor);
         cachedBearDivisor = uint64(_cachedBearDivisor);
 
-        return true;
-    }
-
-    function distribute(address /* _token */) public pure returns (bool) {
         return true;
     }
 

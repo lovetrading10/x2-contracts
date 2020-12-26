@@ -18,10 +18,10 @@ contract X2Market is IX2Market, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
-    // max uint256 has 77 digits, with an initial rebase divisor of 10^20
+    // max uint128 has 38 digits, with an initial rebase divisor of 10^10
     // and assuming 18 decimals for tokens, collateral tokens with a supply
-    // of up to 39 digits can be supported
-    uint256 public constant INITIAL_REBASE_DIVISOR = 10**20;
+    // of up to 10 digits can be supported
+    uint256 public constant INITIAL_REBASE_DIVISOR = 10**10;
 
     address public factory;
 
@@ -140,10 +140,6 @@ contract X2Market is IX2Market, ReentrancyGuard {
 
         emit Withdraw(_receiver, withdrawAmount, fee, IERC20(_token).balanceOf(_receiver));
         return withdrawAmount;
-    }
-
-    function distribute(address /* _token */) public pure override returns (bool) {
-        return true;
     }
 
     function distributeFees() public nonReentrant {
