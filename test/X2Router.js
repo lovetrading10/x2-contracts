@@ -39,7 +39,7 @@ describe("X2Router", function () {
 
   it("deposit", async () => {
     const token0 = await deployContract("X2Token", [])
-    await token0.initialize(factory.address, market.address, "X2:BULL")
+    await token0.initialize(factory.address, market.address)
     await weth.connect(user0).deposit({ value: 100 })
     await weth.connect(user0).approve(router.address, 100)
     await expect(router.connect(user0).deposit(token0.address, 100, 0, user0.address, maxUint256))
@@ -86,8 +86,6 @@ describe("X2Router", function () {
 
   it("depositETH", async () => {
     await factory.createMarket(
-      "X2:3XBULL:ETH/USD",
-      "X2:3XBEAR:ETH/USD",
       feeToken.address,
       priceFeed.address,
       30000, // multiplierBasisPoints, 300%
@@ -101,7 +99,7 @@ describe("X2Router", function () {
       .to.be.revertedWith("X2Router: mismatched collateral")
 
     const token0 = await deployContract("X2Token", [])
-    token0.initialize(factory.address, market.address, "X2:BULL")
+    token0.initialize(factory.address, market.address)
     await expect(router.connect(user0).depositETH(token0.address, 0, user0.address, maxUint256, { value: 100 }))
       .to.be.revertedWith("X2Market: unsupported token")
 
@@ -139,7 +137,7 @@ describe("X2Router", function () {
     await feeToken.connect(user0).approve(router.address, 1)
 
     const token0 = await deployContract("X2Token", [])
-    token0.initialize(factory.address, market.address, "X2:BULL")
+    token0.initialize(factory.address, market.address)
     await weth.connect(user0).deposit({ value: 2000 })
     await weth.connect(user0).approve(router.address, 2000)
     await expect(router.connect(user0).deposit(token0.address, 2000, 1, user0.address, maxUint256))
@@ -171,7 +169,7 @@ describe("X2Router", function () {
     await feeToken.connect(user0).approve(router.address, 1)
 
     const token0 = await deployContract("X2Token", [])
-    token0.initialize(factory.address, market.address, "X2:BULL")
+    token0.initialize(factory.address, market.address)
     await expect(router.connect(user0).depositETH(token0.address, 1, user0.address, maxUint256, { value: 2000 }))
       .to.be.revertedWith("X2Market: unsupported token")
 
@@ -296,8 +294,6 @@ describe("X2Router", function () {
     const receiver1 = { address: "0x42b712f6740cd401f6a9af7ca50f7b67203907ae" }
 
     await factory.createMarket(
-      "X2:3XBULL:ETH/USD",
-      "X2:3XBEAR:ETH/USD",
       feeToken.address,
       priceFeed.address,
       30000, // multiplierBasisPoints, 300%
@@ -351,8 +347,6 @@ describe("X2Router", function () {
     const receiver1 = { address: "0xa0afaa285ce85974c3c881256cb7f225e3a1178a" }
 
     await factory.createMarket(
-      "X2:3XBULL:ETH/USD",
-      "X2:3XBEAR:ETH/USD",
       feeToken.address,
       priceFeed.address,
       30000, // multiplierBasisPoints, 300%

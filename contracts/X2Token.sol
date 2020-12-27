@@ -66,45 +66,44 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _;
     }
 
-    function initialize(address _factory, address _market, string memory _symbol) public {
+    function initialize(address _factory, address _market) public {
         require(!isInitialized, "X2Token: already initialized");
         isInitialized = true;
         factory = _factory;
         market = _market;
-        name = _symbol;
-        symbol = _symbol;
     }
 
-    function setDistributor(address _distributor) external override onlyFactory {
+    function setDistributor(address _distributor) external onlyFactory {
         distributor = _distributor;
     }
 
-    function mint(address _account, uint256 _amount, uint256 _divisor) public override onlyMarket {
+    function setInfo(string memory _name, string memory _symbol) external onlyFactory {
+        name = _name;
+        symbol = _symbol;
+    }
+
+    function mint(address _account, uint256 _amount, uint256 _divisor) external override onlyMarket {
         _mint(_account, _amount, _divisor);
     }
 
-    function burn(address _account, uint256 _amount, bool _distribute) public override onlyMarket {
+    function burn(address _account, uint256 _amount, bool _distribute) external override onlyMarket {
         _burn(_account, _amount, _distribute);
     }
 
-    function totalSupply() public view override returns (uint256) {
+    function totalSupply() external view override returns (uint256) {
         return _totalSupply.div(getDivisor());
     }
 
-    function balanceOf(address _account) public view override returns (uint256) {
-        return uint256(ledgers[_account].balance).div(getDivisor());
-    }
-
-    function transfer(address _recipient, uint256 _amount) public override returns (bool) {
+    function transfer(address _recipient, uint256 _amount) external override returns (bool) {
         _transfer(msg.sender, _recipient, _amount);
         return true;
     }
 
-    function allowance(address _owner, address _spender) public view override returns (uint256) {
+    function allowance(address _owner, address _spender) external view override returns (uint256) {
         return allowances[_owner][_spender];
     }
 
-    function approve(address _spender, uint256 _amount) public override returns (bool) {
+    function approve(address _spender, uint256 _amount) external override returns (bool) {
         _approve(msg.sender, _spender, _amount);
         return true;
     }
@@ -116,8 +115,26 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return true;
     }
 
+    function claim(address _receiver) external nonReentrant {
+        address _account = msg.sender;
+        uint256 cachedTotalSupply = _totalSupply;
+        _updateFarm(_account, cachedTotalSupply, true);
+
+        Reward storage reward = rewards[_account];
+        uint256 rewardToClaim = reward.claimable;
+        totalClaimedRewards = totalClaimedRewards.add(rewardToClaim);
+        reward.claimable = 0;
+
+        (bool success,) = _receiver.call{value: rewardToClaim}("");
+        require(success, "X2Token: transfer failed");
+    }
+
     function getDivisor() public view returns (uint256) {
         return IX2Market(market).getDivisor(address(this));
+    }
+
+    function balanceOf(address _account) public view override returns (uint256) {
+        return uint256(ledgers[_account].balance).div(getDivisor());
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {

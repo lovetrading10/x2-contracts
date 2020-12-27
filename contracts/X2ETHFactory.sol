@@ -27,10 +27,7 @@ contract X2ETHFactory is IX2ETHFactory {
 
     mapping (address => uint256) public feeBasisPoints;
 
-    event CreateMarket(
-        string bullToken,
-        string bearToken,
-        address collateralToken,
+    event CreateETHMarket(
         address priceFeed,
         uint256 multiplierBasisPoints,
         uint256 maxProfitBasisPoints,
@@ -63,9 +60,11 @@ contract X2ETHFactory is IX2ETHFactory {
         X2Token(_token).setDistributor(_distributor);
     }
 
+    function setInfo(address _token, string memory _name, string memory _symbol) external onlyGov {
+        X2Token(_token).setInfo(_name, _symbol);
+    }
+
     function createETHMarket(
-        string memory _bullTokenSymbol,
-        string memory _bearTokenSymbol,
         address _priceFeed,
         uint256 _multiplierBasisPoints,
         uint256 _maxProfitBasisPoints
@@ -83,20 +82,17 @@ contract X2ETHFactory is IX2ETHFactory {
         );
 
         X2Token bullToken = new X2Token();
-        bullToken.initialize(address(this), address(market), _bullTokenSymbol);
+        bullToken.initialize(address(this), address(market));
 
         X2Token bearToken = new X2Token();
-        bearToken.initialize(address(this), address(market), _bearTokenSymbol);
+        bearToken.initialize(address(this), address(market));
 
         market.setBullToken(address(bullToken));
         market.setBearToken(address(bearToken));
 
         markets.push(address(market));
 
-        emit CreateMarket(
-            _bullTokenSymbol,
-            _bearTokenSymbol,
-            address(0),
+        emit CreateETHMarket(
             _priceFeed,
             _multiplierBasisPoints,
             _maxProfitBasisPoints,

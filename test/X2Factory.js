@@ -37,8 +37,6 @@ describe("X2Factory", function () {
   it("enableFreeMarketCreation", async () => {
     expect(await factory.freeMarketCreation()).eq(false)
     await expect(factory.connect(user0).createMarket(
-      "X2:BULL",
-      "X2:BEAR",
       weth.address,
       priceFeed.address,
       50000, // multiplierBasisPoints, 500%
@@ -54,8 +52,6 @@ describe("X2Factory", function () {
     expect(await factory.marketsLength()).eq(1)
 
     await factory.connect(user0).createMarket(
-      "X2:BULL",
-      "X2:BEAR",
       weth.address,
       priceFeed.address,
       50000, // multiplierBasisPoints, 500%
@@ -68,8 +64,6 @@ describe("X2Factory", function () {
 
   it("createMarket", async () => {
     await expect(factory.connect(user0).createMarket(
-      "X2:BULL",
-      "X2:BEAR",
       weth.address,
       priceFeed.address,
       50000, // multiplierBasisPoints, 500%
@@ -78,8 +72,6 @@ describe("X2Factory", function () {
     )).to.be.revertedWith("X2Factory: forbidden")
 
     await factory.createMarket(
-      "X2:BULL",
-      "X2:BEAR",
       weth.address,
       priceFeed.address,
       50000, // multiplierBasisPoints, 500%
@@ -100,14 +92,6 @@ describe("X2Factory", function () {
     expect(await market.maxProfitBasisPoints()).eq(8000)
     expect(await market.lastPrice()).eq(toChainlinkPrice(1000))
 
-    expect(await bullToken.market()).eq(market.address)
-    expect(await bullToken.name()).eq("X2:BULL")
-    expect(await bullToken.symbol()).eq("X2:BULL")
-
-    expect(await bearToken.market()).eq(market.address)
-    expect(await bearToken.name()).eq("X2:BEAR")
-    expect(await bearToken.symbol()).eq("X2:BEAR")
-
     await expect(market.initialize(
       factory.address,
       weth.address,
@@ -119,10 +103,10 @@ describe("X2Factory", function () {
       50 // minDeltaBasisPoints, 0.5%
     )).to.be.revertedWith("X2Market: already initialized")
 
-    await expect(bullToken.initialize(factory.address, market.address, "X2:BULL"))
+    await expect(bullToken.initialize(factory.address, market.address))
       .to.be.revertedWith("X2Token: already initialized")
 
-    await expect(bearToken.initialize(factory.address, market.address, "X2:BEAR"))
+    await expect(bearToken.initialize(factory.address, market.address))
       .to.be.revertedWith("X2Token: already initialized")
   })
 

@@ -44,9 +44,6 @@ describe("X2ETHMarket", function () {
     await vault.setDistributor(distributor.address)
     await vault.addSender(bullToken.address)
     await vault.addSender(bearToken.address)
-
-    await factory.setDistributor(bullToken.address, vault.address)
-    await factory.setDistributor(bearToken.address, vault.address)
   })
 
   it("inits", async () => {

@@ -22,8 +22,6 @@ async function loadFixtures(provider) {
   await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
 
   const tx = await factory.createMarket(
-    "X2:3XBULL:ETH/USD",
-    "X2:3XBEAR:ETH/USD",
     weth.address,
     priceFeed.address,
     30000, // multiplierBasisPoints, 300%
@@ -49,8 +47,6 @@ async function loadETHFixtures(provider) {
   await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
 
   const tx = await factory.createETHMarket(
-      "X2:3XBULL:ETH/USD",
-      "X2:3XBEAR:ETH/USD",
       priceFeed.address,
       30000, // multiplierBasisPoints, 300%
       9000 // maxProfitBasisPoints, 90%
