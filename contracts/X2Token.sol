@@ -189,7 +189,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
     function _updateFarm(address _account, uint256 _cachedTotalSupply, bool _distribute) private {
         if (_distribute && distributor != address(0)) {
-            IX2Fund(distributor).distribute(address(this));
+            IX2Fund(distributor).distribute();
         }
 
         uint256 newTotalFarmRewards = address(this).balance.add(totalClaimedRewards).mul(PRECISION);

@@ -36,7 +36,7 @@ describe("X2ETHMarket", function () {
     floor = xvixFixtures.floor
 
     vault = await deployContract("BurnVault", [xvix.address, floor.address])
-    distributor = await deployContract("X2Distributor", [bullToken.address, bearToken.address, vault.address])
+    distributor = await deployContract("X2Distributor", [vault.address])
 
     await xvix.createSafe(vault.address)
     await xvix.setTransferConfig(vault.address, 0, 0, 0, 0)
