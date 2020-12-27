@@ -10,6 +10,7 @@ import "./interfaces/IX2ETHFactory.sol";
 import "./interfaces/IX2FeeReceiver.sol";
 import "./interfaces/IX2PriceFeed.sol";
 import "./interfaces/IX2Token.sol";
+import "./interfaces/IChi.sol";
 
 contract X2ETHMarket is ReentrancyGuard {
     using SafeMath for uint256;
@@ -46,11 +47,21 @@ contract X2ETHMarket is ReentrancyGuard {
 
     uint256 public feeReserve;
 
+    IChi public chi;
+
     bool public isInitialized;
 
     modifier onlyFactory() {
         require(msg.sender == factory, "X2ETHMarket: forbidden");
         _;
+    }
+
+    modifier discountCHI {
+        uint256 gasStart = gasleft();
+        _;
+        uint256 gasSpent = 21000 + gasStart - gasleft() + 16 *
+                           msg.data.length;
+        chi.freeFromUpTo(msg.sender, (gasSpent + 14154) / 41947);
     }
 
     function initialize(
@@ -85,48 +96,34 @@ contract X2ETHMarket is ReentrancyGuard {
         previousBearDivisor = INITIAL_REBASE_DIVISOR;
     }
 
+    function setChi(IChi _chi) public onlyFactory {
+        chi = _chi;
+    }
+
     function buy(address _token, address _receiver) public payable nonReentrant returns (uint256) {
-        bool isBull = _token == bullToken;
-        require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
-        uint256 amount = msg.value;
-        require(amount > 0, "X2ETHMarket: insufficient collateral sent");
+        return _buy(_token, _receiver);
+    }
 
-        rebase();
-
-        uint256 fee = _collectFees(amount);
-        uint256 depositAmount = amount.sub(fee);
-        IX2Token(_token).mint(_receiver, depositAmount, isBull ? cachedBullDivisor : cachedBearDivisor);
-
-        return depositAmount;
+    function buyUsingChi(address _token, address _receiver) public payable nonReentrant discountCHI returns (uint256) {
+        return _buy(_token, _receiver);
     }
 
     function sell(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
-        require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
-        rebase();
+        return _sell(_token, _amount, _receiver, true);
+    }
 
-        IX2Token(_token).burn(msg.sender, _amount, true);
-
-        uint256 fee = _collectFees(_amount);
-        uint256 withdrawAmount = _amount.sub(fee);
-        (bool success,) = _receiver.call{value: withdrawAmount}("");
-        require(success, "X2ETHMarket: transfer failed");
-
-        return withdrawAmount;
+    function sellUsingChi(address _token, uint256 _amount, address _receiver) public nonReentrant discountCHI returns (uint256) {
+        return _sell(_token, _amount, _receiver, true);
     }
 
     function sellAll(address _token, address _receiver) public nonReentrant returns (uint256) {
-        require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
-        rebase();
-
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
-        IX2Token(_token).burn(msg.sender, amount, true);
+        return _sell(_token, amount, _receiver, true);
+    }
 
-        uint256 fee = _collectFees(amount);
-        uint256 withdrawAmount = amount.sub(fee);
-        (bool success,) = _receiver.call{value: withdrawAmount}("");
-        require(success, "X2ETHMarket: transfer failed");
-
-        return withdrawAmount;
+    function sellAllUsingChi(address _token, address _receiver) public nonReentrant discountCHI returns (uint256) {
+        uint256 amount = IERC20(_token).balanceOf(msg.sender);
+        return _sell(_token, amount, _receiver, true);
     }
 
     // since an X2Token's distributor can be set by the factory's gov,
@@ -135,17 +132,7 @@ contract X2ETHMarket is ReentrancyGuard {
     // this ensures that tokens can always be sold even if the distributor
     // is set to an address that intentionally fails when `distribute` is called
     function sellWithoutDistribution(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
-        require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
-        rebase();
-
-        IX2Token(_token).burn(msg.sender, _amount, false);
-
-        uint256 fee = _collectFees(_amount);
-        uint256 withdrawAmount = _amount.sub(fee);
-        (bool success,) = _receiver.call{value: withdrawAmount}("");
-        require(success, "X2ETHMarket: transfer failed");
-
-        return withdrawAmount;
+        return _sell(_token, _amount, _receiver, false);
     }
 
     function rebase() public returns (bool) {
@@ -384,5 +371,34 @@ contract X2ETHMarket is ReentrancyGuard {
 
         feeReserve = feeReserve.add(fee);
         return fee;
+    }
+
+    function _buy(address _token, address _receiver) private returns (uint256) {
+        bool isBull = _token == bullToken;
+        require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
+        uint256 amount = msg.value;
+        require(amount > 0, "X2ETHMarket: insufficient collateral sent");
+
+        rebase();
+
+        uint256 fee = _collectFees(amount);
+        uint256 depositAmount = amount.sub(fee);
+        IX2Token(_token).mint(_receiver, depositAmount, isBull ? cachedBullDivisor : cachedBearDivisor);
+
+        return depositAmount;
+    }
+
+    function _sell(address _token, uint256 _amount, address _receiver, bool distribute) private returns (uint256) {
+        require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
+        rebase();
+
+        IX2Token(_token).burn(msg.sender, _amount, distribute);
+
+        uint256 fee = _collectFees(_amount);
+        uint256 withdrawAmount = _amount.sub(fee);
+        (bool success,) = _receiver.call{value: withdrawAmount}("");
+        require(success, "X2ETHMarket: transfer failed");
+
+        return withdrawAmount;
     }
 }

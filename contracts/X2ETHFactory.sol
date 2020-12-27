@@ -6,6 +6,7 @@ import "./libraries/math/SafeMath.sol";
 import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2ETHFactory.sol";
+import "./interfaces/IChi.sol";
 
 import "./X2ETHMarket.sol";
 import "./X2Token.sol";
@@ -62,6 +63,10 @@ contract X2ETHFactory is IX2ETHFactory {
 
     function setInfo(address _token, string memory _name, string memory _symbol) external onlyGov {
         X2Token(_token).setInfo(_name, _symbol);
+    }
+
+    function setChi(address _market, IChi _chi) external onlyGov {
+        X2ETHMarket(_market).setChi(_chi);
     }
 
     function createETHMarket(
