@@ -21,25 +21,25 @@ describe("BurnVault", function () {
     await xvix.setTransferConfig(vault.address, 0, 0, 0, 0)
   })
 
-  // it("deposit", async () => {
-  //   await expect(vault.connect(user0).deposit(0))
-  //     .to.be.revertedWith("BurnVault: insufficient amount")
-  //   await expect(vault.connect(user0).deposit(100))
-  //     .to.be.revertedWith("XVIX: transfer amount exceeds allowance")
-  //
-  //   await xvix.connect(user0).approve(vault.address, 100)
-  //   await expect(vault.connect(user0).deposit(100))
-  //     .to.be.revertedWith("XVIX: subtraction amount exceeds balance")
-  //
-  //   await xvix.transfer(user0.address, 1000)
-  //   expect(await xvix.balanceOf(user0.address)).eq(995)
-  //
-  //   await vault.connect(user0).deposit(100)
-  //
-  //   expect(await xvix.balanceOf(user0.address)).eq(895)
-  //   expect(await xvix.balanceOf(vault.address)).eq(100)
-  //   expect(await vault.balanceOf(user0.address)).eq(100)
-  // })
+  it("deposit", async () => {
+    await expect(vault.connect(user0).deposit(0))
+      .to.be.revertedWith("BurnVault: insufficient amount")
+    await expect(vault.connect(user0).deposit(100))
+      .to.be.revertedWith("XVIX: transfer amount exceeds allowance")
+
+    await xvix.connect(user0).approve(vault.address, 100)
+    await expect(vault.connect(user0).deposit(100))
+      .to.be.revertedWith("XVIX: subtraction amount exceeds balance")
+
+    await xvix.transfer(user0.address, 1000)
+    expect(await xvix.balanceOf(user0.address)).eq(995)
+
+    await vault.connect(user0).deposit(100)
+
+    expect(await xvix.balanceOf(user0.address)).eq(895)
+    expect(await xvix.balanceOf(vault.address)).eq(100)
+    expect(await vault.balanceOf(user0.address)).eq(100)
+  })
 
   it("reduces burns", async () => {
     await xvix.transfer(user0.address, expandDecimals(200, 18))
@@ -101,6 +101,13 @@ describe("BurnVault", function () {
     expect(burn2).eq("199177987149350133") // ~0.199 burnt
 
     expect(await vault.totalSupply()).eq(balance0.add(balance2))
+    expect(await vault.toBurn()).eq(burn0.add(burn2))
+
+    await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
+    expect(await vault.balanceOf(user0.address), "0")
+    expect(await xvix.balanceOf(user0.address), "198602041229783759303")
+
+    expect(await vault.totalSupply()).eq(balance2)
     expect(await vault.toBurn()).eq(burn0.add(burn2))
   })
 })
