@@ -11,7 +11,7 @@ describe("X2Fee", function () {
   let feeToken
 
   beforeEach(async () => {
-    const fixtures = await loadFixtures(provider, wallet)
+    const fixtures = await loadFixtures(provider)
     feeToken = fixtures.feeToken
   })
 

@@ -11,7 +11,7 @@ async function contractAt(name, address) {
   return await contractFactory.attach(address)
 }
 
-async function loadFixtures(provider, wallet) {
+async function loadFixtures(provider) {
   const weth = await deployContract("WETH", [])
   const feeToken = await deployContract("X2Fee", [expandDecimals(1000, 18)])
   const feeReceiver = await deployContract("X2FeeReceiver", [])
@@ -40,7 +40,7 @@ async function loadFixtures(provider, wallet) {
   return { weth, feeToken, feeReceiver, factory, router, priceFeed, market, bullToken, bearToken }
 }
 
-async function loadETHFixtures(provider, wallet) {
+async function loadETHFixtures(provider) {
   const weth = await deployContract("WETH", [])
   const feeReceiver = await deployContract("X2FeeReceiver", [])
   const factory = await deployContract("X2ETHFactory", [weth.address])
@@ -65,9 +65,21 @@ async function loadETHFixtures(provider, wallet) {
   return { weth, feeReceiver, factory, priceFeed, market, bullToken, bearToken }
 }
 
+async function loadXvixFixtures(provider) {
+  const govHandoverTime = 1 // for testing convenience use a govHandoverTime that has already passed
+  const initialSupply = expandDecimals(1000, 18)
+  const maxSupply = expandDecimals(2000, 18)
+  const xvix = await deployContract("XVIX", [initialSupply, maxSupply, govHandoverTime])
+  const floor = await deployContract("Floor", [xvix.address])
+  await xvix.setFloor(floor.address)
+
+  return { xvix, floor }
+}
+
 module.exports = {
   deployContract,
   contractAt,
   loadFixtures,
-  loadETHFixtures
+  loadETHFixtures,
+  loadXvixFixtures
 }

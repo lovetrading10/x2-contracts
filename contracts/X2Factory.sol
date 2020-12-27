@@ -59,6 +59,10 @@ contract X2Factory is IX2Factory {
         freeMarketCreation = true;
     }
 
+    function setDistributor(address _token, address _distributor) external onlyGov {
+        IX2Token(_token).setDistributor(_distributor);
+    }
+
     function createMarket(
         string memory _bullTokenSymbol,
         string memory _bearTokenSymbol,

@@ -3,5 +3,5 @@
 pragma solidity 0.6.12;
 
 interface IX2Distributor {
-    function distribute(address receiver) external returns (bool);
+    function distribute(address receiver, uint256 amount) external;
 }

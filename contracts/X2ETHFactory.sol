@@ -6,7 +6,6 @@ import "./libraries/math/SafeMath.sol";
 import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2ETHFactory.sol";
-import "./interfaces/IX2Distributor.sol";
 
 import "./X2ETHMarket.sol";
 import "./X2Token.sol";

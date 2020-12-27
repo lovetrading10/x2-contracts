@@ -17,7 +17,7 @@ describe("X2Factory", function () {
   let feeToken
 
   beforeEach(async () => {
-    const fixtures = await loadFixtures(provider, wallet)
+    const fixtures = await loadFixtures(provider)
     weth = fixtures.weth
     factory = fixtures.factory
     market = fixtures.market

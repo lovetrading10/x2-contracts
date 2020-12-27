@@ -1,6 +1,6 @@
 const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
-const { loadETHFixtures, contractAt } = require("./shared/fixtures")
+const { loadETHFixtures, loadXvixFixtures, contractAt, deployContract } = require("./shared/fixtures")
 const { maxUint256, expandDecimals, reportGasUsed, increaseTime, mineBlock } = require("./shared/utilities")
 const { toChainlinkPrice } = require("./shared/chainlink")
 
@@ -16,9 +16,13 @@ describe("X2ETHMarket", function () {
   let market
   let bullToken
   let bearToken
+  let xvix
+  let floor
+  let vault
+  let distributor
 
   beforeEach(async () => {
-    const fixtures = await loadETHFixtures(provider, wallet)
+    const fixtures = await loadETHFixtures(provider)
     weth = fixtures.weth
     factory = fixtures.factory
     router = fixtures.router
@@ -26,6 +30,23 @@ describe("X2ETHMarket", function () {
     market = fixtures.market
     bullToken = fixtures.bullToken
     bearToken = fixtures.bearToken
+
+    const xvixFixtures = await loadXvixFixtures(provider)
+    xvix = xvixFixtures.xvix
+    floor = xvixFixtures.floor
+
+    vault = await deployContract("BurnVault", [xvix.address, floor.address])
+    distributor = await deployContract("X2Distributor", [bullToken.address, bearToken.address, vault.address])
+
+    await xvix.createSafe(vault.address)
+    await xvix.setTransferConfig(vault.address, 0, 0, 0, 0)
+
+    await vault.setDistributor(distributor.address)
+    await vault.addSender(bullToken.address)
+    await vault.addSender(bearToken.address)
+
+    await factory.setDistributor(bullToken.address, vault.address)
+    await factory.setDistributor(bearToken.address, vault.address)
   })
 
   it("inits", async () => {

@@ -15,7 +15,7 @@ describe("X2Token", function () {
   let market
 
   beforeEach(async () => {
-    const fixtures = await loadFixtures(provider, wallet)
+    const fixtures = await loadFixtures(provider)
     bullToken = fixtures.bullToken
     router = fixtures.router
     priceFeed = fixtures.priceFeed

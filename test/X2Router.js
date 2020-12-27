@@ -20,7 +20,7 @@ describe("X2Router", function () {
   let feeReceiver
 
   beforeEach(async () => {
-    const fixtures = await loadFixtures(provider, wallet)
+    const fixtures = await loadFixtures(provider)
     weth = fixtures.weth
     factory = fixtures.factory
     router = fixtures.router
