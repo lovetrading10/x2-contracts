@@ -180,13 +180,21 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
         uint256 cachedTotalSupply = _totalSupply;
         _updateFarm(_account, cachedTotalSupply, true);
+
         uint256 scaledAmount = _amount.mul(_divisor);
-        uint256 nextBalance = uint256(ledgers[_account].balance).add(scaledAmount);
+        Ledger memory ledger = ledgers[_account];
+
+        uint256 nextBalance = uint256(ledger.balance).add(scaledAmount);
         require(nextBalance < MAX_BALANCE, "X2Token: balance limit exceeded");
+
+        uint256 cost = uint256(ledger.cost).add(_amount);
+        require(cost < MAX_BALANCE, "X2Token: cost limit exceeded");
+
         ledgers[_account] = Ledger(
             uint128(nextBalance),
-            uint128(nextBalance.div(_divisor)) // current cost
+            uint128(cost)
         );
+
         _totalSupply = cachedTotalSupply.add(scaledAmount);
     }
 
@@ -195,12 +203,18 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
         uint256 cachedTotalSupply = _totalSupply;
         _updateFarm(_account, cachedTotalSupply, _distribute);
+
         uint256 scaledAmount = _amount.mul(_divisor);
-        uint256 nextBalance = uint256(ledgers[_account].balance).sub(scaledAmount);
+        Ledger memory ledger = ledgers[_account];
+
+        uint256 nextBalance = uint256(ledger.balance).sub(scaledAmount);
+        uint256 cost = uint256(ledger.cost).mul(nextBalance).div(ledger.balance);
+
         ledgers[_account] = Ledger(
             uint128(nextBalance),
-            uint128(nextBalance.div(_divisor)) // current cost
+            uint128(cost)
         );
+
         _totalSupply = cachedTotalSupply.sub(scaledAmount);
     }
 
