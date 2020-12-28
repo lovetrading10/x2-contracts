@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 
 import "./libraries/math/SafeMath.sol";
-import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2ETHFactory.sol";
 import "./interfaces/IChi.sol";
@@ -13,7 +12,6 @@ import "./X2Token.sol";
 
 contract X2ETHFactory is IX2ETHFactory {
     using SafeMath for uint256;
-    using SafeERC20 for IERC20;
 
     uint256 public constant MAX_FEE_BASIS_POINTS = 40; // max 0.4% fee
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
@@ -21,7 +19,6 @@ contract X2ETHFactory is IX2ETHFactory {
     address public gov;
     address public distributor;
     address public override feeReceiver;
-    address public weth;
 
     address[] public markets;
     bool public freeMarketCreation = false;
@@ -38,14 +35,15 @@ contract X2ETHFactory is IX2ETHFactory {
     event GovChange(address gov);
     event FeeChange(address market, uint256 fee);
     event FeeReceiverChange(address feeReceiver);
+    event DistributorChange(address token, address distributor);
+    event InfoChange(address token, string name, string symbol);
 
     modifier onlyGov() {
         require(msg.sender == gov, "X2Factory: forbidden");
         _;
     }
 
-    constructor(address _weth) public {
-        weth = _weth;
+    constructor() public {
         gov = msg.sender;
     }
 
@@ -59,10 +57,12 @@ contract X2ETHFactory is IX2ETHFactory {
 
     function setDistributor(address _token, address _distributor) external onlyGov {
         X2Token(_token).setDistributor(_distributor);
+        emit DistributorChange(_token, _distributor);
     }
 
     function setInfo(address _token, string memory _name, string memory _symbol) external onlyGov {
         X2Token(_token).setInfo(_name, _symbol);
+        emit InfoChange(_token, _name, _symbol);
     }
 
     function setChi(address _market, IChi _chi) external onlyGov {

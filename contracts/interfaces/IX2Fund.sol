@@ -3,5 +3,5 @@
 pragma solidity 0.6.12;
 
 interface IX2Fund {
-    function distribute() external;
+    function distribute() external returns (uint256);
 }

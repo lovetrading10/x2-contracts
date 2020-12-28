@@ -29,24 +29,22 @@ contract X2ETHMarket is ReentrancyGuard {
     uint80 public lastRound;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
-    // max uint128 has 38 digits, with an initial rebase divisor of 10^10
+    // X2Token.balance uses uint128, max uint128 has 38 digits
+    // with an initial rebase divisor of 10^10
     // and 18 decimals for ETH, collateral of up to 10 billion ETH
     // can be supported
     uint64 public constant INITIAL_REBASE_DIVISOR = 10**10;
     uint256 public constant MAX_DIVISOR = uint64(-1);
     int256 public constant MAX_PRICE = uint176(-1);
 
-    address public factory;
-
-    address public weth;
     address public bullToken;
     address public bearToken;
     address public priceFeed;
     uint256 public multiplierBasisPoints;
     uint256 public maxProfitBasisPoints;
-
     uint256 public feeReserve;
 
+    address public factory;
     IChi public chi;
 
     bool public isInitialized;
@@ -136,17 +134,13 @@ contract X2ETHMarket is ReentrancyGuard {
     }
 
     function rebase() public returns (bool) {
+        uint256 _lastPrice = uint256(lastPrice);
         uint256 nextPrice = latestPrice();
         uint80 _latestRound = latestRound();
         uint256 _lastRound = lastRound;
         if (_latestRound == _lastRound) { return false; }
 
-        (uint256 _cachedBullDivisor, uint256 _cachedBearDivisor) = getDivisors(uint256(lastPrice), nextPrice);
-
-        // avoid overflows
-        if (_cachedBullDivisor > MAX_DIVISOR || _cachedBearDivisor > MAX_DIVISOR) {
-            return false;
-        }
+        (uint256 _cachedBullDivisor, uint256 _cachedBearDivisor) = getDivisors(_lastPrice, nextPrice);
 
         // the latest round is just one after the last recorded round
         // so update the previous divisors to the cached divisors
@@ -161,18 +155,21 @@ contract X2ETHMarket is ReentrancyGuard {
             return true;
         }
 
-        // if the previous price cannot be retrieved then do not rebase
+        // if the previous price cannot be retrieved then
+        // update the previous divisors to the cached divisors
+        // and update the cached divisors to the latest divisors
         (bool ok, uint256 previousPrice) = getRoundPrice(_latestRound - 1);
         if (!ok) {
+            lastPrice = uint176(nextPrice);
+            lastRound = _latestRound;
+            previousBullDivisor = cachedBullDivisor;
+            previousBearDivisor = cachedBearDivisor;
+            cachedBullDivisor = uint64(_cachedBullDivisor);
+            cachedBearDivisor = uint64(_cachedBearDivisor);
             return false;
         }
 
-        (uint256 _previousBullDivisor, uint256 _previousBearDivisor) = getDivisors(uint256(lastPrice), previousPrice);
-
-        // avoid overflows
-        if (_previousBullDivisor > MAX_DIVISOR || _previousBearDivisor > MAX_DIVISOR) {
-            return false;
-        }
+        (uint256 _previousBullDivisor, uint256 _previousBearDivisor) = getDivisors(_lastPrice, previousPrice);
 
         lastPrice = uint176(nextPrice);
         lastRound = _latestRound;
@@ -229,31 +226,18 @@ contract X2ETHMarket is ReentrancyGuard {
         // if the latest round is the same as the last recorded round
         // then select the largest divisor from the previous and cached divisors
         if (_latestRound == _lastRound) {
-            if (isBull) {
-                uint256 _cachedBullDivisor = uint256(cachedBullDivisor);
-                uint256 _previousBullDivisor = uint256(previousBullDivisor);
-                return _cachedBullDivisor > _previousBullDivisor ? _cachedBullDivisor : _previousBullDivisor;
-            }
-            uint256 _cachedBearDivisor = uint256(cachedBearDivisor);
-            uint256 _previousBearDivisor = uint256(previousBearDivisor);
-            return _cachedBearDivisor > _previousBearDivisor ? _cachedBearDivisor : _previousBearDivisor;
+            return isBull ? _max(previousBullDivisor, cachedBullDivisor) : _max(previousBearDivisor, cachedBearDivisor);
         }
+
+        uint256 _lastPrice = uint256(lastPrice);
+        uint256 nextPrice = latestPrice();
+        (uint256 nextBullDivisor, uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
 
         // if the latest round is just after the last recorded round
         // then select the largest divisor from the cached divisor and the
         // divisor for the next price
-        uint256 _lastPrice = uint256(lastPrice);
-        uint256 nextPrice = latestPrice();
         if (_latestRound == _lastRound + 1) {
-            if (isBull) {
-                uint256 _cachedBullDivisor = uint256(cachedBullDivisor);
-                (uint256 nextBullDivisor,) = getDivisors(_lastPrice, nextPrice);
-                return _cachedBullDivisor > nextBullDivisor ? _cachedBullDivisor : nextBullDivisor;
-            }
-
-            uint256 _cachedBearDivisor = uint256(cachedBearDivisor);
-            (,uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
-            return _cachedBearDivisor > nextBearDivisor ? _cachedBearDivisor : nextBearDivisor;
+            return isBull ? _max(cachedBullDivisor, nextBullDivisor) : _max(cachedBearDivisor, nextBearDivisor);
         }
 
         (bool ok, uint256 previousPrice) = getRoundPrice(_latestRound - 1);
@@ -261,41 +245,11 @@ contract X2ETHMarket is ReentrancyGuard {
         // then fallback to selecting the largest divisor from the cached divisor
         // and the divisor for the next price
         if (!ok) {
-            if (isBull) {
-                uint256 _cachedBullDivisor = uint256(cachedBullDivisor);
-                (uint256 nextBullDivisor,) = getDivisors(_lastPrice, nextPrice);
-                return _cachedBullDivisor > nextBullDivisor ? _cachedBullDivisor : nextBullDivisor;
-            }
-
-            uint256 _cachedBearDivisor = uint256(cachedBearDivisor);
-            (,uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
-            return _cachedBearDivisor > nextBearDivisor ? _cachedBearDivisor : nextBearDivisor;
+            return isBull ? _max(cachedBullDivisor, nextBullDivisor) : _max(cachedBearDivisor, nextBearDivisor);
         }
 
-        // if the price just before the latest round can be retrieved
-        // then select the largest divisor from the divisor for the latest price
-        // and the divisor for the price just before the latest price
-        if (isBull) {
-            (uint256 _previousBullDivisor,) = getDivisors(_lastPrice, previousPrice);
-            (uint256 nextBullDivisor,) = getDivisors(_lastPrice, nextPrice);
-            return nextBullDivisor > _previousBullDivisor ? nextBullDivisor : _previousBullDivisor;
-        }
-
-        (, uint256 _previousBearDivisor) = getDivisors(_lastPrice, previousPrice);
-        (, uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
-        return nextBearDivisor > _previousBearDivisor ? nextBearDivisor : _previousBearDivisor;
-    }
-
-    function getPrices(uint80 r0, uint80 r1) public view returns (bool, uint256, uint256) {
-        address _priceFeed = priceFeed;
-        (, int256 p0, , ,) = IX2PriceFeed(_priceFeed).getRoundData(r0);
-        (, int256 p1, , ,) = IX2PriceFeed(_priceFeed).getRoundData(r1);
-
-        if (p0 <= 0 || p0 > MAX_PRICE || p1 <= 0 || p1 > MAX_PRICE) {
-            return (false, 0, 0);
-        }
-
-        return (true, uint256(p0), uint256(p1));
+        (uint256 _previousBullDivisor, uint256 _previousBearDivisor) = getDivisors(_lastPrice, previousPrice);
+        return isBull ? _max(_previousBullDivisor, nextBullDivisor) : _max(_previousBearDivisor, nextBearDivisor);
     }
 
     function getRoundPrice(uint80 round) public view returns (bool, uint256) {
@@ -352,6 +306,10 @@ contract X2ETHMarket is ReentrancyGuard {
         return (_getNextDivisor(bullRefSupply, totalBulls, cachedBullDivisor), _getNextDivisor(bearRefSupply, totalBears, cachedBearDivisor));
     }
 
+    function _max(uint256 a, uint256 b) private pure returns (uint256) {
+        return a > b ? a : b;
+    }
+
     function _getNextDivisor(uint256 _refSupply, uint256 _nextSupply, uint256 _fallbackDivisor) private pure returns (uint256) {
         if (_nextSupply == 0) {
             return INITIAL_REBASE_DIVISOR;
@@ -359,8 +317,8 @@ contract X2ETHMarket is ReentrancyGuard {
 
         // round up the divisor
         uint256 divisor = _refSupply.mul(10).div(_nextSupply).add(9).div(10);
-        // prevent the cachedDivisor from being set to 0
-        if (divisor == 0) { return _fallbackDivisor; }
+        // prevent the cachedDivisor from overflowing or being set to 0
+        if (divisor == 0 || divisor > MAX_DIVISOR) { return _fallbackDivisor; }
 
         return divisor;
     }

@@ -87,7 +87,7 @@ contract BurnVault is ReentrancyGuard {
         emit Withdraw(account, _amount);
     }
 
-    function distribute() external nonReentrant {
+    function distribute() external nonReentrant returns (uint256) {
         require(senders[msg.sender], "BurnVault: forbidden");
         address _distributor = distributor;
 
@@ -95,18 +95,16 @@ contract BurnVault is ReentrancyGuard {
 
         uint256 _toBurn = toBurn();
         if (_toBurn == 0) {
-            IX2Distributor(_distributor).distribute(receiver, 0);
-            return;
+            return IX2Distributor(_distributor).distribute(receiver, 0);
         }
 
         uint256 refundAmount = IFloor(floor).getRefundAmount(_toBurn);
         if (refundAmount == 0) {
-            IX2Distributor(_distributor).distribute(receiver, 0);
-            return;
+            return IX2Distributor(_distributor).distribute(receiver, 0);
         }
 
         uint256 ethAmount = IFloor(floor).refund(_distributor, _toBurn);
-        IX2Distributor(_distributor).distribute(receiver, ethAmount);
+        return IX2Distributor(_distributor).distribute(receiver, ethAmount);
     }
 
     function totalSupply() public view returns (uint256) {

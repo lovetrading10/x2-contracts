@@ -12,7 +12,7 @@ import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
 import "hardhat/console.sol";
 
-// farming code adapated from https://github.com/trusttoken/smart-contracts/blob/master/contracts/truefi/TrueFarm.sol
+// rewards code adapated from https://github.com/trusttoken/smart-contracts/blob/master/contracts/truefi/TrueFarm.sol
 contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -50,9 +50,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     mapping(address => Reward) public rewards;
     // track overall cumulative rewards
     uint256 public cumulativeRewardPerToken;
-    // track total rewards
-    uint256 public totalClaimedRewards;
-    uint256 public totalFarmRewards;
 
     bool public isInitialized;
 
@@ -118,11 +115,10 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     function claim(address _receiver) external nonReentrant {
         address _account = msg.sender;
         uint256 cachedTotalSupply = _totalSupply;
-        _updateFarm(_account, cachedTotalSupply, true);
+        _updateRewards(_account, cachedTotalSupply, true);
 
         Reward storage reward = rewards[_account];
         uint256 rewardToClaim = reward.claimable;
-        totalClaimedRewards = totalClaimedRewards.add(rewardToClaim);
         reward.claimable = 0;
 
         (bool success,) = _receiver.call{value: rewardToClaim}("");
@@ -138,8 +134,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
-        IX2Market(market).rebase();
-
         require(_sender != address(0), "X2Token: transfer from the zero address");
         require(_recipient != address(0), "X2Token: transfer to the zero address");
 
@@ -179,7 +173,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         if (_amount == 0) { return; }
 
         uint256 cachedTotalSupply = _totalSupply;
-        _updateFarm(_account, cachedTotalSupply, true);
+        _updateRewards(_account, cachedTotalSupply, true);
 
         uint256 scaledAmount = _amount.mul(_divisor);
         Ledger memory ledger = ledgers[_account];
@@ -202,11 +196,15 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         if (_amount == 0) { return; }
 
         uint256 cachedTotalSupply = _totalSupply;
-        _updateFarm(_account, cachedTotalSupply, _distribute);
+        _updateRewards(_account, cachedTotalSupply, _distribute);
 
         uint256 scaledAmount = _amount.mul(_divisor);
         Ledger memory ledger = ledgers[_account];
 
+        // since _amount is not zero, so scaledAmount should not be zero
+        // if ledger.balance is zero, then uint256(ledger.balance).sub(scaledAmount)
+        // should fail, so we can calculate cost with ...div(ledger.balance)
+        // as ledger.balance should not be zero
         uint256 nextBalance = uint256(ledger.balance).sub(scaledAmount);
         uint256 cost = uint256(ledger.cost).mul(nextBalance).div(ledger.balance);
 
@@ -218,21 +216,17 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _totalSupply = cachedTotalSupply.sub(scaledAmount);
     }
 
-    function _updateFarm(address _account, uint256 _cachedTotalSupply, bool _distribute) private {
-        if (_distribute && distributor != address(0)) {
-            IX2Fund(distributor).distribute();
-        }
+    function _updateRewards(address _account, uint256 _cachedTotalSupply, bool _distribute) private {
+        uint256 blockReward;
 
-        uint256 newTotalFarmRewards = address(this).balance.add(totalClaimedRewards).mul(PRECISION);
-        // calculate block reward
-        uint256 totalBlockReward = newTotalFarmRewards.sub(totalFarmRewards);
-        // update farm rewards
-        totalFarmRewards = newTotalFarmRewards;
+        if (_distribute && distributor != address(0)) {
+            blockReward = IX2Fund(distributor).distribute();
+        }
 
         uint256 _cumulativeRewardPerToken = cumulativeRewardPerToken;
         // if there are stakers
-        if (_totalSupply > 0) {
-            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(totalBlockReward.div(_cachedTotalSupply));
+        if (_totalSupply > 0 && blockReward > 0) {
+            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.div(_cachedTotalSupply));
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
         require(_cumulativeRewardPerToken < MAX_REWARD, "X2Token: cumulativeRewardPerToken limit exceeded");
@@ -246,7 +240,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         rewards[_account] = Reward(
             uint128(claimableReward),
             // update previous cumulative reward for sender
-            uint128(cumulativeRewardPerToken)
+            uint128(_cumulativeRewardPerToken)
         );
     }
 }

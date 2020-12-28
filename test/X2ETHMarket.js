@@ -9,7 +9,6 @@ use(solidity)
 describe("X2ETHMarket", function () {
   const provider = waffle.provider
   const [wallet, user0, user1, user2, user3] = provider.getWallets()
-  let weth
   let factory
   let router
   let priceFeed
@@ -23,7 +22,6 @@ describe("X2ETHMarket", function () {
 
   beforeEach(async () => {
     const fixtures = await loadETHFixtures(provider)
-    weth = fixtures.weth
     factory = fixtures.factory
     router = fixtures.router
     priceFeed = fixtures.priceFeed

@@ -39,9 +39,8 @@ async function loadFixtures(provider) {
 }
 
 async function loadETHFixtures(provider) {
-  const weth = await deployContract("WETH", [])
   const feeReceiver = await deployContract("X2FeeReceiver", [])
-  const factory = await deployContract("X2ETHFactory", [weth.address])
+  const factory = await deployContract("X2ETHFactory", [])
 
   const priceFeed = await deployContract("MockPriceFeed", [])
   await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
@@ -58,7 +57,7 @@ async function loadETHFixtures(provider) {
   const bullToken = await contractAt("X2Token", await market.bullToken())
   const bearToken = await contractAt("X2Token", await market.bearToken())
 
-  return { weth, feeReceiver, factory, priceFeed, market, bullToken, bearToken }
+  return { feeReceiver, factory, priceFeed, market, bullToken, bearToken }
 }
 
 async function loadXvixFixtures(provider) {
