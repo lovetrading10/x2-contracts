@@ -49,6 +49,10 @@ contract X2ETHMarket is ReentrancyGuard {
 
     bool public isInitialized;
 
+    event DistributeFees(address feeReceiver, uint256 amount);
+    event DistributeInterest(address feeReceiver, uint256 amount);
+    event Rebase(uint256 price, uint64 bullDivisor, uint64 bearDivisor);
+
     modifier onlyFactory() {
         require(msg.sender == factory, "X2ETHMarket: forbidden");
         _;
@@ -152,6 +156,7 @@ contract X2ETHMarket is ReentrancyGuard {
             previousBearDivisor = cachedBearDivisor;
             cachedBullDivisor = uint64(_cachedBullDivisor);
             cachedBearDivisor = uint64(_cachedBearDivisor);
+            emit Rebase(nextPrice, uint64(_cachedBullDivisor), uint64(_cachedBearDivisor));
             return true;
         }
 
@@ -166,6 +171,7 @@ contract X2ETHMarket is ReentrancyGuard {
             previousBearDivisor = cachedBearDivisor;
             cachedBullDivisor = uint64(_cachedBullDivisor);
             cachedBearDivisor = uint64(_cachedBearDivisor);
+            emit Rebase(nextPrice, uint64(_cachedBullDivisor), uint64(_cachedBearDivisor));
             return false;
         }
 
@@ -177,7 +183,7 @@ contract X2ETHMarket is ReentrancyGuard {
         previousBearDivisor = uint64(_previousBearDivisor);
         cachedBullDivisor = uint64(_cachedBullDivisor);
         cachedBearDivisor = uint64(_cachedBearDivisor);
-
+        emit Rebase(nextPrice, uint64(_cachedBullDivisor), uint64(_cachedBearDivisor));
         return true;
     }
 
@@ -192,6 +198,7 @@ contract X2ETHMarket is ReentrancyGuard {
         require(success, "X2ETHMarket: transfer failed");
 
         IX2FeeReceiver(feeReceiver).notifyETHFees(fees);
+        emit DistributeFees(feeReceiver, fees);
     }
 
     function distributeInterest() public nonReentrant {
@@ -204,6 +211,7 @@ contract X2ETHMarket is ReentrancyGuard {
         require(success, "X2ETHMarket: transfer failed");
 
         IX2FeeReceiver(feeReceiver).notifyETHInterest(interest);
+        emit DistributeInterest(feeReceiver, interest);
     }
 
     function interestReserve() public view returns (uint256) {

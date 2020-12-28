@@ -60,6 +60,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
     bool public isInitialized;
 
+    event Claim(address receiver, uint256 amount);
+
     modifier onlyFactory() {
         require(msg.sender == factory, "X2Token: forbidden");
         _;
@@ -132,6 +134,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
         (bool success,) = _receiver.call{value: rewardToClaim}("");
         require(success, "X2Token: transfer failed");
+
+        emit Claim(_receiver, rewardToClaim);
     }
 
     function getDivisor() public view returns (uint256) {
