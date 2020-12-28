@@ -129,9 +129,6 @@ contract X2Factory is IX2Factory {
     }
 
     function getFee(address _market, uint256 _amount) external override view returns (uint256) {
-        if (feeReceiver == address(0)) {
-            return 0;
-        }
         return _amount.mul(feeBasisPoints[_market]).div(BASIS_POINTS_DIVISOR);
     }
 }

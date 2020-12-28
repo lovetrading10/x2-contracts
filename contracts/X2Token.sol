@@ -146,6 +146,10 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return uint256(ledgers[_account].balance).div(getDivisor());
     }
 
+    function costOf(address _account) public view returns (uint256) {
+        return uint256(ledgers[_account].cost);
+    }
+
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
         require(_sender != address(0), "X2Token: transfer from the zero address");
         require(_recipient != address(0), "X2Token: transfer to the zero address");

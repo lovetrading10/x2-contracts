@@ -147,8 +147,6 @@ describe("X2Factory", function () {
   it("getFee", async () => {
     expect(await factory.getFee(market.address, 20000)).eq(0)
     await factory.setFee(market.address, 30)
-    expect(await factory.getFee(market.address, 20000)).eq(0)
-    await factory.setFeeReceiver(user1.address)
     expect(await factory.getFee(market.address, 20000)).eq(60)
   })
 })
