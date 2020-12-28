@@ -54,11 +54,7 @@ describe("X2Token", function () {
     expect(await bullToken.balanceOf(user0.address)).eq(100)
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(500))
-
-    expect(await market.lastPrice()).eq(toChainlinkPrice(1000))
     await bullToken.connect(user0).transfer(user1.address, 70)
-    // check that rebase is called, rebase updates lastPrice
-    expect(await market.lastPrice()).eq(toChainlinkPrice(500))
 
     expect(await bullToken.balanceOf(user0.address)).eq(30)
     expect(await bullToken.balanceOf(user1.address)).eq(70)
@@ -95,11 +91,7 @@ describe("X2Token", function () {
       .to.be.reverted
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(500))
-
-    expect(await market.lastPrice()).eq(toChainlinkPrice(1000))
     await bullToken.connect(user2).transferFrom(user0.address, user1.address, 40)
-    // check that rebase is called, rebase updates lastPrice
-    expect(await market.lastPrice()).eq(toChainlinkPrice(500))
 
     expect(await bullToken.balanceOf(user0.address)).eq(40)
     expect(await bullToken.balanceOf(user1.address)).eq(60)
