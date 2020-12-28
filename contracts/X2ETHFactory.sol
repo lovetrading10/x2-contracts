@@ -5,6 +5,7 @@ pragma solidity 0.6.12;
 import "./libraries/math/SafeMath.sol";
 
 import "./interfaces/IX2ETHFactory.sol";
+import "./interfaces/IX2Token.sol";
 import "./interfaces/IChi.sol";
 
 import "./X2ETHMarket.sol";
@@ -56,12 +57,12 @@ contract X2ETHFactory is IX2ETHFactory {
     }
 
     function setDistributor(address _token, address _distributor) external onlyGov {
-        X2Token(_token).setDistributor(_distributor);
+        IX2Token(_token).setDistributor(_distributor);
         emit DistributorChange(_token, _distributor);
     }
 
     function setInfo(address _token, string memory _name, string memory _symbol) external onlyGov {
-        X2Token(_token).setInfo(_name, _symbol);
+        IX2Token(_token).setInfo(_name, _symbol);
         emit InfoChange(_token, _name, _symbol);
     }
 

@@ -10,7 +10,6 @@ import "./libraries/utils/ReentrancyGuard.sol";
 import "./interfaces/IX2Fund.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
-import "hardhat/console.sol";
 
 // rewards code adapated from https://github.com/trusttoken/smart-contracts/blob/master/contracts/truefi/TrueFarm.sol
 contract X2Token is IERC20, IX2Token, ReentrancyGuard {
@@ -22,12 +21,18 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         uint128 cost;
     }
 
+    // max uint128 has 38 digits
+    // the initial divisor has 10 digits
+    // each 1 wei of rewards will increase cumulativeRewardPerToken by
+    // 1*10^10 (PRECISION 10^20 / divisor 10^10)
+    // assuming a supply of only 1 wei of X2Tokens
+    // so total rewards of up to 10^28 wei or 1 billion ETH is supported
     struct Reward {
-        uint128 previousCumulativeRewardPerToken;
         uint128 claimable;
+        uint128 previousCumulativeRewardPerToken;
     }
 
-    uint256 constant PRECISION = 1e30;
+    uint256 constant PRECISION = 1e20;
     uint256 constant MAX_BALANCE = uint128(-1);
     uint256 constant MAX_REWARD = uint128(-1);
 
@@ -50,6 +55,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     mapping(address => Reward) public rewards;
     // track overall cumulative rewards
     uint256 public cumulativeRewardPerToken;
+    // track total rewards
+    uint256 public totalRewards;
 
     bool public isInitialized;
 
@@ -63,6 +70,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _;
     }
 
+    receive() external payable {}
+
     function initialize(address _factory, address _market) public {
         require(!isInitialized, "X2Token: already initialized");
         isInitialized = true;
@@ -70,11 +79,11 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         market = _market;
     }
 
-    function setDistributor(address _distributor) external onlyFactory {
+    function setDistributor(address _distributor) external override onlyFactory {
         distributor = _distributor;
     }
 
-    function setInfo(string memory _name, string memory _symbol) external onlyFactory {
+    function setInfo(string memory _name, string memory _symbol) external override onlyFactory {
         name = _name;
         symbol = _symbol;
     }
@@ -227,23 +236,25 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         // only update cumulativeRewardPerToken when there are stakers, i.e. when _totalSupply > 0
         // if blockReward == 0, then there will be no change to cumulativeRewardPerToken
         if (_totalSupply > 0 && blockReward > 0) {
-            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.div(_cachedTotalSupply));
+            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.mul(PRECISION).div(_cachedTotalSupply));
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
 
         // cumulativeRewardPerToken can only increase
         // so if cumulativeRewardPerToken is zero, it means there are no rewards yet
-        if (_cumulativeRewardPerToken == 0) {
+        // return if _cumulativeRewardPerToken > MAX_REWARD to avoid overflows
+        if (_cumulativeRewardPerToken == 0 || _cumulativeRewardPerToken > MAX_REWARD) {
             return;
         }
-
-        require(_cumulativeRewardPerToken < MAX_REWARD, "X2Token: cumulativeRewardPerToken limit exceeded");
 
         Reward memory reward = rewards[_account];
         uint256 claimableReward = uint256(reward.claimable).add(
             uint256(ledgers[_account].balance).mul(_cumulativeRewardPerToken.sub(reward.previousCumulativeRewardPerToken)).div(PRECISION)
         );
-        require(claimableReward < MAX_REWARD, "X2Token: claimableReward limit exceeded");
+
+        if (claimableReward > MAX_REWARD) {
+            return;
+        }
 
         rewards[_account] = Reward(
             uint128(claimableReward),

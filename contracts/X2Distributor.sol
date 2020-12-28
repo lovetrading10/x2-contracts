@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 
 import "./libraries/math/SafeMath.sol";
-import "hardhat/console.sol";
 
 contract X2Distributor {
     using SafeMath for uint256;
@@ -16,6 +15,8 @@ contract X2Distributor {
     constructor(address _vault) public {
         vault = _vault;
     }
+
+    receive() external payable {}
 
     function distribute(address _receiver, uint256 _amount) external returns (uint256) {
         require(msg.sender == vault, "X2Distributor: forbidden");

@@ -7,4 +7,6 @@ interface IX2Token {
     function market() external view returns (address);
     function mint(address account, uint256 amount, uint256 divisor) external;
     function burn(address account, uint256 amount, bool distribute) external;
+    function setDistributor(address distributor) external;
+    function setInfo(string memory name, string memory symbol) external;
 }

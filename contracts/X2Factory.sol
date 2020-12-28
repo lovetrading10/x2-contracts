@@ -6,6 +6,8 @@ import "./libraries/math/SafeMath.sol";
 import "./libraries/token/SafeERC20.sol";
 
 import "./interfaces/IX2Factory.sol";
+import "./interfaces/IX2Token.sol";
+
 import "./X2Market.sol";
 import "./X2Token.sol";
 
@@ -58,11 +60,11 @@ contract X2Factory is IX2Factory {
     }
 
     function setDistributor(address _token, address _distributor) external onlyGov {
-        X2Token(_token).setDistributor(_distributor);
+        IX2Token(_token).setDistributor(_distributor);
     }
 
     function setInfo(address _token, string memory _name, string memory _symbol) external onlyGov {
-        X2Token(_token).setInfo(_name, _symbol);
+        IX2Token(_token).setInfo(_name, _symbol);
     }
 
     function createMarket(
