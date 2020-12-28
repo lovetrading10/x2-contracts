@@ -1,4 +1,4 @@
-const { expandDecimals, reportGasUsed } = require("./utilities")
+const { expandDecimals } = require("./utilities")
 const { toChainlinkPrice } = require("./chainlink")
 
 async function deployContract(name, args) {
@@ -21,14 +21,13 @@ async function loadFixtures(provider) {
   const priceFeed = await deployContract("MockPriceFeed", [])
   await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
 
-  const tx = await factory.createMarket(
+  await factory.createMarket(
     weth.address,
     priceFeed.address,
     30000, // multiplierBasisPoints, 300%
     9000, // maxProfitBasisPoints, 90%
     50 // minDeltaBasisPoints, 0.5%
   )
-  // reportGasUsed(provider, tx, "createMarket gas used")
 
   const marketAddress = await factory.markets(0)
   const market = await contractAt("X2Market", marketAddress)
@@ -45,12 +44,11 @@ async function loadETHFixtures(provider) {
   const priceFeed = await deployContract("MockPriceFeed", [])
   await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
 
-  const tx = await factory.createETHMarket(
+  await factory.createMarket(
       priceFeed.address,
       30000, // multiplierBasisPoints, 300%
       9000 // maxProfitBasisPoints, 90%
   )
-  // reportGasUsed(provider, tx, "createETHMarket gas used")
 
   const marketAddress = await factory.markets(0)
   const market = await contractAt("X2ETHMarket", marketAddress)

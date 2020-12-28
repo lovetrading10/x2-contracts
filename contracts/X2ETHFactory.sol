@@ -25,7 +25,7 @@ contract X2ETHFactory is IX2ETHFactory {
 
     mapping (address => uint256) public feeBasisPoints;
 
-    event CreateETHMarket(
+    event CreateMarket(
         address priceFeed,
         uint256 multiplierBasisPoints,
         uint256 maxProfitBasisPoints,
@@ -69,7 +69,30 @@ contract X2ETHFactory is IX2ETHFactory {
         X2ETHMarket(_market).setChi(_chi);
     }
 
-    function createETHMarket(
+    function setGov(address _gov) external onlyGov {
+        gov = _gov;
+        emit GovChange(gov);
+    }
+
+    function setFee(address _market, uint256 _feeBasisPoints) external onlyGov {
+        require(_feeBasisPoints <= MAX_FEE_BASIS_POINTS, "X2Factory: fee exceeds allowed limit");
+        feeBasisPoints[_market] = _feeBasisPoints;
+        emit FeeChange(_market, _feeBasisPoints);
+    }
+
+    function setFeeReceiver(address _feeReceiver) external onlyGov {
+        feeReceiver = _feeReceiver;
+        emit FeeReceiverChange(feeReceiver);
+    }
+
+    function getFee(address _market, uint256 _amount) external override view returns (uint256) {
+        if (feeReceiver == address(0)) {
+            return 0;
+        }
+        return _amount.mul(feeBasisPoints[_market]).div(BASIS_POINTS_DIVISOR);
+    }
+
+    function createMarket(
         address _priceFeed,
         uint256 _multiplierBasisPoints,
         uint256 _maxProfitBasisPoints
@@ -97,7 +120,7 @@ contract X2ETHFactory is IX2ETHFactory {
 
         markets.push(address(market));
 
-        emit CreateETHMarket(
+        emit CreateMarket(
             _priceFeed,
             _multiplierBasisPoints,
             _maxProfitBasisPoints,
@@ -105,28 +128,5 @@ contract X2ETHFactory is IX2ETHFactory {
         );
 
         return (address(market), address(bullToken), address(bearToken));
-    }
-
-    function setGov(address _gov) external onlyGov {
-        gov = _gov;
-        emit GovChange(gov);
-    }
-
-    function setFee(address _market, uint256 _feeBasisPoints) external onlyGov {
-        require(_feeBasisPoints <= MAX_FEE_BASIS_POINTS, "X2Factory: fee exceeds allowed limit");
-        feeBasisPoints[_market] = _feeBasisPoints;
-        emit FeeChange(_market, _feeBasisPoints);
-    }
-
-    function setFeeReceiver(address _feeReceiver) external onlyGov {
-        feeReceiver = _feeReceiver;
-        emit FeeReceiverChange(feeReceiver);
-    }
-
-    function getFee(address _market, uint256 _amount) external override view returns (uint256) {
-        if (feeReceiver == address(0)) {
-            return 0;
-        }
-        return _amount.mul(feeBasisPoints[_market]).div(BASIS_POINTS_DIVISOR);
     }
 }
