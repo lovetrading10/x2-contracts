@@ -224,11 +224,19 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         }
 
         uint256 _cumulativeRewardPerToken = cumulativeRewardPerToken;
-        // if there are stakers
+        // only update cumulativeRewardPerToken when there are stakers, i.e. when _totalSupply > 0
+        // if blockReward == 0, then there will be no change to cumulativeRewardPerToken
         if (_totalSupply > 0 && blockReward > 0) {
             _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.div(_cachedTotalSupply));
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
+
+        // cumulativeRewardPerToken can only increase
+        // so if cumulativeRewardPerToken is zero, it means there are no rewards yet
+        if (_cumulativeRewardPerToken == 0) {
+            return;
+        }
+
         require(_cumulativeRewardPerToken < MAX_REWARD, "X2Token: cumulativeRewardPerToken limit exceeded");
 
         Reward memory reward = rewards[_account];
