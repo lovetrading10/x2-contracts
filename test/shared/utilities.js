@@ -24,6 +24,11 @@ async function gasUsed(provider, tx) {
   return (await provider.getTransactionReceipt(tx.hash)).gasUsed
 }
 
+async function getNetworkFee(provider, tx) {
+  const gas = await gasUsed(provider, tx)
+  return gas.mul(tx.gasPrice)
+}
+
 async function reportGasUsed(provider, tx, label) {
   const { gasUsed } = await provider.getTransactionReceipt(tx.hash)
   console.info(label, gasUsed.toString())
@@ -42,6 +47,7 @@ module.exports = {
   mineBlock,
   increaseTime,
   gasUsed,
+  getNetworkFee,
   reportGasUsed,
   getBlockTime
 }

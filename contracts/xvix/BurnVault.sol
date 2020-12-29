@@ -62,7 +62,6 @@ contract BurnVault is ReentrancyGuard {
 
     function deposit(uint256 _amount) external nonReentrant {
         require(_amount > 0, "BurnVault: insufficient amount");
-        IXVIX(token).rebase();
 
         address account = msg.sender;
         IERC20(token).transferFrom(account, address(this), _amount);
@@ -75,7 +74,7 @@ contract BurnVault is ReentrancyGuard {
     }
 
     function withdraw(address _receiver, uint256 _amount) external nonReentrant {
-        IXVIX(token).rebase();
+        require(_amount > 0, "BurnVault: insufficient amount");
 
         address account = msg.sender;
         uint256 scaledAmount = _amount.mul(getDivisor());
