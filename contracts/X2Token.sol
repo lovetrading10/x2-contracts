@@ -36,8 +36,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     uint256 constant MAX_BALANCE = uint128(-1);
     uint256 constant MAX_REWARD = uint128(-1);
 
-    string public name;
-    string public symbol;
+    string public name = "X2";
+    string public symbol = "X2";
     uint8 public constant decimals = 18;
 
     // _totalSupply also tracks totalStaked

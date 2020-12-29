@@ -61,9 +61,16 @@ contract X2ETHFactory is IX2ETHFactory {
         emit DistributorChange(_token, _distributor);
     }
 
-    function setInfo(address _token, string memory _name, string memory _symbol) external onlyGov {
-        IX2Token(_token).setInfo(_name, _symbol);
-        emit InfoChange(_token, _name, _symbol);
+    function setInfo(
+        address _bullToken,
+        string calldata _bullName,
+        string calldata _bullSymbol,
+        address _bearToken,
+        string calldata _bearName,
+        string calldata _bearSymbol
+    ) external onlyGov {
+        IX2Token(_bullToken).setInfo(_bullName, _bullSymbol);
+        IX2Token(_bearToken).setInfo(_bearName, _bearSymbol);
     }
 
     function setChi(address _market, IChi _chi) external onlyGov {

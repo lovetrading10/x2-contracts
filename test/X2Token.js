@@ -56,8 +56,8 @@ describe("X2Token", function () {
     await expect(token.connect(user1).setInfo("X2:BULL Token", "X2:BULL"))
       .to.be.revertedWith("X2Token: forbidden")
 
-    expect(await token.name()).eq("")
-    expect(await token.symbol()).eq("")
+    expect(await token.name()).eq("X2")
+    expect(await token.symbol()).eq("X2")
 
     await token.connect(user0).setInfo("X2:BULL Token", "X2:BULL")
     expect(await token.name()).eq("X2:BULL Token")

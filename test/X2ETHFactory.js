@@ -72,17 +72,34 @@ describe("X2ETHFactory", function () {
 
   it("setInfo", async () => {
     expect(await factory.gov()).eq(wallet.address)
-    await expect(factory.connect(user0).setInfo(bullToken.address, "X2:BULL Token", "X2:BULL"))
-      .to.be.revertedWith("X2Factory: forbidden")
+    await expect(factory.connect(user0).setInfo(
+      bullToken.address,
+      "X2:BULL Token",
+      "X2:BULL",
+      bearToken.address,
+      "X2:BEAR Token",
+      "X2:BEAR"
+    )).to.be.revertedWith("X2Factory: forbidden")
 
     await factory.setGov(user0.address)
     expect(await factory.gov()).eq(user0.address)
 
-    expect(await bullToken.name()).eq("")
-    expect(await bullToken.symbol()).eq("")
-    await factory.connect(user0).setInfo(bullToken.address, "X2:BULL Token", "X2:BULL")
+    expect(await bullToken.name()).eq("X2")
+    expect(await bullToken.symbol()).eq("X2")
+    expect(await bearToken.name()).eq("X2")
+    expect(await bearToken.symbol()).eq("X2")
+    await factory.connect(user0).setInfo(
+      bullToken.address,
+      "X2:BULL Token",
+      "X2:BULL",
+      bearToken.address,
+      "X2:BEAR Token",
+      "X2:BEAR"
+    )
     expect(await bullToken.name()).eq("X2:BULL Token")
     expect(await bullToken.symbol()).eq("X2:BULL")
+    expect(await bearToken.name()).eq("X2:BEAR Token")
+    expect(await bearToken.symbol()).eq("X2:BEAR")
   })
 
   it("setChi", async () => {
