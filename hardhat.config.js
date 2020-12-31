@@ -30,7 +30,7 @@ module.exports = {
     },
     mainnet: {
       url: MAINNET_URL,
-      gasPrice: 40000000000,
+      gasPrice: 97000000000,
       accounts: [MAINNET_DEPLOY_KEY]
     }
   },
