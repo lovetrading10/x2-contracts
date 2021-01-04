@@ -9,9 +9,10 @@ import "./libraries/token/IERC20.sol";
 import "./interfaces/IX2ETHFactory.sol";
 import "./interfaces/IX2PriceFeed.sol";
 import "./interfaces/IX2Token.sol";
+import "./interfaces/IX2Market.sol";
 import "./interfaces/IChi.sol";
 
-contract X2ETHMarket is ReentrancyGuard {
+contract X2ETHMarket is ReentrancyGuard, IX2Market {
     using SafeMath for uint256;
 
     // use a single storage slot
@@ -36,6 +37,10 @@ contract X2ETHMarket is ReentrancyGuard {
     uint256 public constant MAX_DIVISOR = uint64(-1);
     int256 public constant MAX_PRICE = uint176(-1);
 
+    uint256 public constant MAX_FUNDING_POINTS = 100; // 0.1%
+    uint256 public constant FUNDING_POINTS_DIVISOR = 100000;
+    uint256 public constant MIN_FUNDING_INTERVAL = 30 minutes;
+
     address public bullToken;
     address public bearToken;
     address public priceFeed;
@@ -45,6 +50,10 @@ contract X2ETHMarket is ReentrancyGuard {
 
     address public factory;
     IChi public chi;
+
+    uint256 public fundingPoints;
+    uint256 public fundingInterval;
+    uint256 public lastFundingTime;
 
     bool public isInitialized;
 
@@ -82,6 +91,14 @@ contract X2ETHMarket is ReentrancyGuard {
 
         lastPrice = uint176(latestPrice());
         require(lastPrice != 0, "X2ETHMarket: unsupported price feed");
+    }
+
+    function setFunding(uint256 _fundingPoints, uint256 _fundingInterval) public override onlyFactory {
+        require(_fundingPoints <= MAX_FUNDING_POINTS, "X2ETHMarket: fundingPoints exceeds limit");
+        require(_fundingInterval >= MIN_FUNDING_INTERVAL, "X2ETHMarket: fundingInterval below limit");
+
+        fundingPoints = _fundingPoints;
+        fundingInterval = _fundingInterval;
     }
 
     function setBullToken(address _bullToken) public onlyFactory {
@@ -145,6 +162,7 @@ contract X2ETHMarket is ReentrancyGuard {
         if (_latestRound == _lastRound) { return false; }
 
         (uint256 _cachedBullDivisor, uint256 _cachedBearDivisor) = getDivisors(_lastPrice, nextPrice);
+        _updateLastFundingTime();
 
         // the latest round is just one after the last recorded round
         // so update the previous divisors to the cached divisors
@@ -156,6 +174,7 @@ contract X2ETHMarket is ReentrancyGuard {
             previousBearDivisor = cachedBearDivisor;
             cachedBullDivisor = uint64(_cachedBullDivisor);
             cachedBearDivisor = uint64(_cachedBearDivisor);
+
             emit Rebase(nextPrice, uint64(_cachedBullDivisor), uint64(_cachedBearDivisor));
             return true;
         }
@@ -228,7 +247,7 @@ contract X2ETHMarket is ReentrancyGuard {
         return balance.sub(totalBulls).sub(totalBears).sub(feeReserve);
     }
 
-    function getDivisor(address _token) public view returns (uint256) {
+    function getDivisor(address _token) public override view returns (uint256) {
         uint80 _lastRound = lastRound;
         uint80 _latestRound = latestRound();
         bool isBull = _token == bullToken;
@@ -286,10 +305,6 @@ contract X2ETHMarket is ReentrancyGuard {
     }
 
     function getDivisors(uint256 _lastPrice, uint256 _nextPrice) public view returns (uint256, uint256) {
-        if (_nextPrice == _lastPrice) {
-            return (cachedBullDivisor, cachedBearDivisor);
-        }
-
         uint256 bullRefSupply = IX2Token(bullToken)._totalSupply();
         uint256 bearRefSupply = IX2Token(bearToken)._totalSupply();
 
@@ -313,7 +328,24 @@ contract X2ETHMarket is ReentrancyGuard {
         totalBears = _nextPrice > _lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
         }
 
+        if (fundingPoints > 0 && fundingInterval > 0) {
+            uint256 intervals = block.timestamp.sub(lastFundingTime).div(fundingInterval);
+            if (intervals > 0) {
+                if (totalBulls > totalBears) {
+                    totalBulls = totalBulls.sub(totalBulls.mul(intervals).mul(fundingPoints).div(FUNDING_POINTS_DIVISOR));
+                } else {
+                    totalBears = totalBears.sub(totalBears.mul(intervals).mul(fundingPoints).div(FUNDING_POINTS_DIVISOR));
+                }
+            }
+        }
+
         return (_getNextDivisor(bullRefSupply, totalBulls, cachedBullDivisor), _getNextDivisor(bearRefSupply, totalBears, cachedBearDivisor));
+    }
+
+    function _updateLastFundingTime() private {
+        if (fundingPoints > 0 && fundingInterval > 0) {
+            lastFundingTime = block.timestamp;
+        }
     }
 
     function _max(uint256 a, uint256 b) private pure returns (uint256) {

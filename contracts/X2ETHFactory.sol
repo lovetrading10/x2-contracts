@@ -38,6 +38,7 @@ contract X2ETHFactory is IX2ETHFactory {
     event FeeReceiverChange(address feeReceiver);
     event DistributorChange(address token, address distributor);
     event InfoChange(address token, string name, string symbol);
+    event FundingChange(address market, uint256 fundingPoints, uint256 fundingInterval);
 
     modifier onlyGov() {
         require(msg.sender == gov, "X2Factory: forbidden");
@@ -61,6 +62,11 @@ contract X2ETHFactory is IX2ETHFactory {
         emit DistributorChange(_token, _distributor);
     }
 
+    function setFunding(address _market, uint256 _fundingPoints, uint256 _fundingInterval) external onlyGov {
+        IX2Market(_market).setFunding(_fundingPoints, _fundingInterval);
+        emit FundingChange(_market, _fundingPoints, _fundingInterval);
+    }
+
     function setInfo(
         address _bullToken,
         string calldata _bullName,
@@ -71,6 +77,8 @@ contract X2ETHFactory is IX2ETHFactory {
     ) external onlyGov {
         IX2Token(_bullToken).setInfo(_bullName, _bullSymbol);
         IX2Token(_bearToken).setInfo(_bearName, _bearSymbol);
+        emit InfoChange(_bullToken, _bullName, _bullSymbol);
+        emit InfoChange(_bearToken, _bearName, _bearSymbol);
     }
 
     function setChi(address _market, IChi _chi) external onlyGov {

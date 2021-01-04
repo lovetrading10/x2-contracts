@@ -40,7 +40,7 @@ describe("X2ETHMarket", function () {
     await factory.setDistributor(bearToken.address, distributor.address)
 
     await wallet.sendTransaction({ to: distributor.address, value: expandDecimals(2, 18) })
-    await distributor.setETHPerInterval([bullToken.address, bearToken.address], ["10000000000000000", "10000000000000000"]) // 0.01 ETH per hour
+    await distributor.setDistribution([bullToken.address, bearToken.address], ["10000000000000000", "10000000000000000"]) // 0.01 ETH per hour
   })
 
   it("inits", async () => {
@@ -520,5 +520,40 @@ describe("X2ETHMarket", function () {
     await market.distributeInterest()
     expect(await provider.getBalance(feeReceiver.address)).eq("6000000000280000000")
     expect(await market.interestReserve()).eq(0)
+  })
+
+  it("setFunding", async () => {
+    await expect(factory.setFunding(market.address, 101, 60 * 60))
+      .to.be.revertedWith("X2ETHMarket: fundingPoints exceeds limit")
+    await expect(factory.setFunding(market.address, 100, 30 * 60 - 1))
+      .to.be.revertedWith("X2ETHMarket: fundingInterval below limit")
+
+    expect(await market.fundingPoints()).eq(0)
+    expect(await market.fundingInterval()).eq(0)
+    await factory.setFunding(market.address, 100, 30 * 60)
+    expect(await market.fundingPoints()).eq(100)
+    expect(await market.fundingInterval()).eq(30 * 60)
+
+    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+    expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
+
+    await increaseTime(provider, 30 * 60 + 10)
+    await mineBlock(provider)
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
+    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(5, 18) })
+    expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(5, 18))
+    expect(await bearToken.totalSupply()).eq(expandDecimals(5, 18))
+
+    expect(await bullToken.balanceOf(user0.address)).eq("9990000000009990000") // ~9.99, 10 - 10 * 100 / 100000
+    expect(await bullToken.totalSupply()).eq("9990000000009990000")
+    expect(await market.interestReserve()).eq("9999999990010000") // ~0.00999...
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+    expect(await bullToken.balanceOf(user0.address)).eq("11489999999301408000")
+    expect(await bullToken.totalSupply()).eq("11489999999301408000") // ~11.4899..., 9.99 + 1.4999 = 11.4899
+    expect(await market.interestReserve()).eq("9999999990010000") // ~0.00999...
   })
 })
