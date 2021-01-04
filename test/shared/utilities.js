@@ -40,6 +40,14 @@ async function getBlockTime(provider) {
   return block.timestamp
 }
 
+async function getTxnBalances(provider, user, txn, callback) {
+    const balance0 = await provider.getBalance(user.address)
+    const tx = await txn()
+    const fee = await getNetworkFee(provider, tx)
+    const balance1 = await provider.getBalance(user.address)
+    callback(balance0, balance1, fee)
+}
+
 module.exports = {
   maxUint256,
   bigNumberify,
@@ -49,5 +57,6 @@ module.exports = {
   gasUsed,
   getNetworkFee,
   reportGasUsed,
-  getBlockTime
+  getBlockTime,
+  getTxnBalances
 }

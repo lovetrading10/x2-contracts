@@ -17,7 +17,6 @@ describe("X2ETHMarket", function () {
   let bearToken
   let xvix
   let floor
-  let vault
   let distributor
   let feeReceiver
 
@@ -35,15 +34,13 @@ describe("X2ETHMarket", function () {
     xvix = xvixFixtures.xvix
     floor = xvixFixtures.floor
 
-    vault = await deployContract("BurnVault", [xvix.address, floor.address])
-    distributor = await deployContract("X2Distributor", [vault.address])
+    distributor = await deployContract("X2TimeDistributor", [])
 
-    await xvix.createSafe(vault.address)
-    await xvix.setTransferConfig(vault.address, 0, 0, 0, 0)
+    await factory.setDistributor(bullToken.address, distributor.address)
+    await factory.setDistributor(bearToken.address, distributor.address)
 
-    await vault.setDistributor(distributor.address)
-    await vault.addSender(bullToken.address)
-    await vault.addSender(bearToken.address)
+    await wallet.sendTransaction({ to: distributor.address, value: expandDecimals(2, 18) })
+    await distributor.setETHPerInterval([bullToken.address, bearToken.address], ["10000000000000000", "10000000000000000"]) // 0.01 ETH per hour
   })
 
   it("inits", async () => {
@@ -513,10 +510,15 @@ describe("X2ETHMarket", function () {
     expect(await provider.getBalance(feeReceiver.address)).eq("1310000000")
     expect(await market.interestReserve()).eq(0)
 
+    // since the price is 900 currently, user1 has potential profits of 13 - 10, 3
+    // if user1 sells early, then the amount is settled based on a price of 1100
+    // so the user only receives 7 ETH
+    // the excess ETH is stored in the interestReserve
     await market.connect(user1).sell(bearToken.address, "6999999999860000000", user1.address)
     expect(await market.interestReserve()).eq("5999999998970000000")
 
     await market.distributeInterest()
     expect(await provider.getBalance(feeReceiver.address)).eq("6000000000280000000")
+    expect(await market.interestReserve()).eq(0)
   })
 })

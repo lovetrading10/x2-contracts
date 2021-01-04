@@ -156,10 +156,16 @@ describe("X2ETHFactory", function () {
   })
 
   it("createMarket", async () => {
+    await expect(factory.createMarket(
+      priceFeed.address,
+      50000,
+      10001
+    )).to.be.reverted
+
     const tx = await factory.createMarket(
       priceFeed.address,
       50000, // multiplierBasisPoints, 500%
-      8000 // maxProfitBasisPoints, 90%
+      10000 // maxProfitBasisPoints, 100%
     )
     await reportGasUsed(provider, tx, "createMarket gas used")
 
@@ -173,7 +179,7 @@ describe("X2ETHFactory", function () {
     expect(await market.factory()).eq(factory.address)
     expect(await market.priceFeed()).eq(priceFeed.address)
     expect(await market.multiplierBasisPoints()).eq(50000)
-    expect(await market.maxProfitBasisPoints()).eq(8000)
+    expect(await market.maxProfitBasisPoints()).eq(10000)
     expect(await market.lastPrice()).eq(toChainlinkPrice(1000))
 
     expect(await bullToken.factory()).eq(factory.address)

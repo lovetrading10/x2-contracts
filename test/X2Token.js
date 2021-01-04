@@ -131,9 +131,9 @@ describe("X2Token", function () {
     await factory.setDistributor(bullToken.address, distributor.address)
 
     expect(await bullToken.totalSupply()).eq(0)
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: 100 })
-    expect(await bullToken.balanceOf(user0.address)).eq(100)
-    expect(await bullToken.totalSupply()).eq(100)
+    await market.connect(user0).buy(bullToken.address, user0.address, { value: 1000000000000 })
+    expect(await bullToken.balanceOf(user0.address)).eq(1000000000000)
+    expect(await bullToken.totalSupply()).eq(1000000000000)
 
     await wallet.sendTransaction({ to: distributor.address, value: 500 })
 
@@ -160,21 +160,21 @@ describe("X2Token", function () {
     expect(await bullToken.balanceOf(user1.address)).eq(expandDecimals(90, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(100, 18))
 
-    await wallet.sendTransaction({ to: distributor.address, value: expandDecimals(500, 18) })
+    await wallet.sendTransaction({ to: distributor.address, value: expandDecimals(1, 10) })
 
     expect(await provider.getBalance(receiver0.address)).eq(0)
     await bullToken.connect(user0).claim(receiver0.address)
-    expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(50, 18))
+    expect(await provider.getBalance(receiver0.address)).eq("1000000000")
 
     expect(await provider.getBalance(receiver1.address)).eq(0)
     await bullToken.connect(user1).claim(receiver1.address)
-    expect(await provider.getBalance(receiver1.address)).eq(expandDecimals(450, 18))
+    expect(await provider.getBalance(receiver1.address)).eq("9000000000")
 
     await bullToken.connect(user0).claim(receiver0.address)
-    expect(await provider.getBalance(receiver0.address)).eq(expandDecimals(50, 18))
+    expect(await provider.getBalance(receiver0.address)).eq("1000000000")
 
     await bullToken.connect(user1).claim(receiver1.address)
-    expect(await provider.getBalance(receiver1.address)).eq(expandDecimals(450, 18))
+    expect(await provider.getBalance(receiver1.address)).eq("9000000000")
   })
 
   it("rewards after sell", async () => {

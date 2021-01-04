@@ -7,7 +7,6 @@ import "./libraries/utils/ReentrancyGuard.sol";
 import "./libraries/token/IERC20.sol";
 
 import "./interfaces/IX2ETHFactory.sol";
-import "./interfaces/IX2FeeReceiver.sol";
 import "./interfaces/IX2PriceFeed.sol";
 import "./interfaces/IX2Token.sol";
 import "./interfaces/IChi.sol";
@@ -73,6 +72,7 @@ contract X2ETHMarket is ReentrancyGuard {
         uint256 _maxProfitBasisPoints
     ) public {
         require(!isInitialized, "X2ETHMarket: already initialized");
+        require(_maxProfitBasisPoints <= BASIS_POINTS_DIVISOR, "X2ETHMarket: maxProfitBasisPoints limit exceeded");
         isInitialized = true;
 
         factory = _factory;
@@ -187,7 +187,7 @@ contract X2ETHMarket is ReentrancyGuard {
         return true;
     }
 
-    function distributeFees() public nonReentrant {
+    function distributeFees() public nonReentrant returns (uint256) {
         address feeReceiver = IX2ETHFactory(factory).feeReceiver();
         require(feeReceiver != address(0), "X2Market: empty feeReceiver");
 
@@ -197,11 +197,12 @@ contract X2ETHMarket is ReentrancyGuard {
         (bool success,) = feeReceiver.call{value: fees}("");
         require(success, "X2ETHMarket: transfer failed");
 
-        IX2FeeReceiver(feeReceiver).notifyETHFees(fees);
         emit DistributeFees(feeReceiver, fees);
+
+        return fees;
     }
 
-    function distributeInterest() public nonReentrant {
+    function distributeInterest() public nonReentrant returns (uint256) {
         address feeReceiver = IX2ETHFactory(factory).feeReceiver();
         require(feeReceiver != address(0), "X2Market: empty feeReceiver");
 
@@ -210,8 +211,9 @@ contract X2ETHMarket is ReentrancyGuard {
         (bool success,) = feeReceiver.call{value: interest}("");
         require(success, "X2ETHMarket: transfer failed");
 
-        IX2FeeReceiver(feeReceiver).notifyETHInterest(interest);
         emit DistributeInterest(feeReceiver, interest);
+
+        return interest;
     }
 
     function interestReserve() public view returns (uint256) {

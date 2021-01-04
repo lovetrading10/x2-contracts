@@ -244,6 +244,16 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         // only update cumulativeRewardPerToken when there are stakers, i.e. when _totalSupply > 0
         // if blockReward == 0, then there will be no change to cumulativeRewardPerToken
         if (_totalSupply > 0 && blockReward > 0) {
+            // PRECISION is 10^20 and the BASE_DIVISOR is 10^10
+            // cachedTotalSupply = _totalSupply * divisor
+            // the divisor will be around 10^10
+            // if 1000 ETH worth is minted, then cachedTotalSupply = 1000 * 10^18 * 10^10 = 10^31
+            // cumulativeRewardPerToken will increase by blockReward * 10^20 / (10^31)
+            // if the blockReward is 0.001 ETH, 10^-3 ETH or 10^-3 * 10^18 WEI
+            // then cumulativeRewardPerToken will increase by 10^-3 * 10^18 * 10^20 / (10^31)
+            // which is 10^35 / 10^31 or 10^4
+            // if rewards are distributed every hour then at least 0.168 ETH should be distributed per week
+            // so that there will not be precision issues for distribution
             _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.mul(PRECISION).div(_cachedTotalSupply));
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
@@ -255,6 +265,12 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
             return;
         }
 
+        // ledgers[_account].balance = balance * divisor
+        // this divisor will be around 10^10
+        // assuming that cumulativeRewardPerToken increases by at least 10^4
+        // the claimableReward will increase by balance * 10^10 * 10^4 / 10^20
+        // if the total supply is 1000 ETH
+        // a user must own at least 10^-6 ETH or 0.000001 ETH worth of tokens to get some rewards
         Reward memory reward = rewards[_account];
         uint256 claimableReward = uint256(reward.claimable).add(
             uint256(ledgers[_account].balance).mul(_cumulativeRewardPerToken.sub(reward.previousCumulativeRewardPerToken)).div(PRECISION)
