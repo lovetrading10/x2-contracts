@@ -41,8 +41,8 @@ async function createMarket({ factory, priceFeed, multiplierBasisPoints,
 
 async function main() {
   const factory = await deployContract("X2ETHFactory", [])
-  // const priceFeed = { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" } // MAINNET
-  const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" } // KOVAN
+  const priceFeed = { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" } // MAINNET
+  // const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" } // KOVAN
 
   const { market, bullToken, bearToken } = await createMarket({
     factory,
@@ -59,7 +59,7 @@ async function main() {
   const distributor = await deployContract("X2TimeDistributor", [])
   await sendTxn(factory.setDistributor(bullToken.address, distributor.address), "factory.setDistributor(bullToken)")
   await sendTxn(factory.setDistributor(bearToken.address, distributor.address), "factory.setDistributor(bearToken)")
-  await sendTxn(distributor.setDistribution([bullToken.address, bearToken.address], ["1000000000000000", "10000000000000000"]), "factory.setDistribution") // 0.001 and 0.01 ETH per hour
+  await sendTxn(distributor.setDistribution([bullToken.address, bearToken.address], ["2000000000000000", "20000000000000000"]), "factory.setDistribution") // 0.002 and 0.02 ETH per hour
 
   // await sendTxn(factory.setFee(market.address, 20), "factory.setFee")
   // await sendTxn(factory.setFeeReceiver(feeReceiver.address), "factory.setFeeReceiver")
