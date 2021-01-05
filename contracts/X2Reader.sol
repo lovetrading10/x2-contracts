@@ -25,18 +25,23 @@ contract X2Reader {
     }
 
     function getRewards(address _token, address _account) public view returns (uint256[] memory) {
-        uint256[] memory amounts = new uint256[](2);
+        uint256[] memory amounts = new uint256[](3);
         address distributor = IX2Token(_token).distributor();
         if (distributor == address(0)) {
             return amounts;
         }
 
+        amounts[0] = IX2TimeDistributor(distributor).ethPerInterval(_token);
+
         uint256 rewards = IX2Token(_token).getReward(_account);
         uint256 pendingRewards = IX2TimeDistributor(distributor).getDistributionAmount(_token);
         uint256 balance = IX2Token(_token)._balanceOf(_account);
         uint256 supply = IX2Token(_token)._totalSupply();
-        amounts[0] = rewards.add(pendingRewards.mul(balance).div(supply));
-        amounts[1] = IX2TimeDistributor(distributor).ethPerInterval(_token);
+        if (supply > 0) {
+            amounts[1] = rewards.add(pendingRewards.mul(balance).div(supply));
+        }
+        amounts[2] = IERC20(_token).totalSupply();
+
         return amounts;
     }
 

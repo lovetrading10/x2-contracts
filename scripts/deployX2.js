@@ -56,6 +56,11 @@ async function main() {
     label: "factory.createMarket 3X ETH/USD"
   })
 
+  const distributor = await deployContract("X2TimeDistributor", [])
+  await sendTxn(factory.setDistributor(bullToken.address, distributor.address), "factory.setDistributor(bullToken)")
+  await sendTxn(factory.setDistributor(bearToken.address, distributor.address), "factory.setDistributor(bearToken)")
+  await sendTxn(distributor.setDistribution([bullToken.address, bearToken.address], ["1000000000000000", "10000000000000000"]), "factory.setDistribution") // 0.001 and 0.01 ETH per hour
+
   // await sendTxn(factory.setFee(market.address, 20), "factory.setFee")
   // await sendTxn(factory.setFeeReceiver(feeReceiver.address), "factory.setFeeReceiver")
 
