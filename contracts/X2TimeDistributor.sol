@@ -3,16 +3,17 @@
 pragma solidity 0.6.12;
 
 import "./libraries/math/SafeMath.sol";
+import "./interfaces/IX2TimeDistributor.sol";
 
-contract X2TimeDistributor {
+contract X2TimeDistributor is IX2TimeDistributor {
     using SafeMath for uint256;
 
     uint256 public constant DISTRIBUTION_INTERVAL = 1 hours;
 
     address public gov;
 
-    mapping (address => uint256) public ethPerInterval;
-    mapping (address => uint256) public lastDistributionTime;
+    mapping (address => uint256) public override ethPerInterval;
+    mapping (address => uint256) public override lastDistributionTime;
 
     event Distribute(address receiver, uint256 amount);
     event DistributionChange(address receiver, uint256 amount);
@@ -44,22 +45,29 @@ contract X2TimeDistributor {
     }
 
     function distribute() external returns (uint256) {
-        uint256 _ethPerInterval = ethPerInterval[msg.sender];
-        if (_ethPerInterval == 0) { return 0; }
+        address receiver = msg.sender;
+        uint256 amount = getDistributionAmount(receiver);
+        lastDistributionTime[msg.sender] = block.timestamp;
 
-        uint256 currentTime = block.timestamp;
-        uint256 timeDiff = currentTime.sub(lastDistributionTime[msg.sender]);
-        uint256 intervals = timeDiff.div(DISTRIBUTION_INTERVAL);
-        uint256 amount = _ethPerInterval.mul(intervals);
-
-        lastDistributionTime[msg.sender] = currentTime;
-
-        if (address(this).balance < amount) { return 0; }
+        if (amount == 0) { return 0; }
 
         (bool success,) = msg.sender.call{value: amount}("");
         require(success, "X2TimeDistributor: transfer failed");
 
         emit Distribute(msg.sender, amount);
+        return amount;
+    }
+
+    function getDistributionAmount(address receiver) public override view returns (uint256) {
+        uint256 _ethPerInterval = ethPerInterval[receiver];
+        if (_ethPerInterval == 0) { return 0; }
+
+        uint256 timeDiff = block.timestamp.sub(lastDistributionTime[receiver]);
+        uint256 intervals = timeDiff.div(DISTRIBUTION_INTERVAL);
+        uint256 amount = _ethPerInterval.mul(intervals);
+
+        if (address(this).balance < amount) { return 0; }
+
         return amount;
     }
 }

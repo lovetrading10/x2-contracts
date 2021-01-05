@@ -45,7 +45,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
     address public override market;
     address public factory;
-    address public distributor;
+    address public override distributor;
 
     // ledgers track balances and costs
     mapping (address => Ledger) public ledgers;
@@ -138,7 +138,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         emit Claim(_receiver, rewardToClaim);
     }
 
-    function getDivisor() public view returns (uint256) {
+    function getDivisor() public override view returns (uint256) {
         return IX2Market(market).getDivisor(address(this));
     }
 
@@ -146,8 +146,16 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return uint256(ledgers[_account].balance).div(getDivisor());
     }
 
-    function costOf(address _account) public view returns (uint256) {
+    function _balanceOf(address _account) public view override returns (uint256) {
+        return uint256(ledgers[_account].balance);
+    }
+
+    function costOf(address _account) public override view returns (uint256) {
         return uint256(ledgers[_account].cost);
+    }
+
+    function getReward(address _account) public override view returns (uint256) {
+        return uint256(rewards[_account].claimable);
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {

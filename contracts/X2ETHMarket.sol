@@ -18,14 +18,14 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     // use a single storage slot
     // max uint64 has 19 digits so it can support the INITIAL_REBASE_DIVISOR
     // increasing by 10^9 times
-    uint64 public previousBullDivisor;
-    uint64 public previousBearDivisor;
-    uint64 public cachedBullDivisor;
-    uint64 public cachedBearDivisor;
+    uint64 public override previousBullDivisor;
+    uint64 public override previousBearDivisor;
+    uint64 public override cachedBullDivisor;
+    uint64 public override cachedBearDivisor;
 
     // use a single storage slot
     // max uint176 can store prices up to 52 digits
-    uint176 public lastPrice;
+    uint176 public override lastPrice;
     uint80 public lastRound;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
@@ -41,8 +41,8 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint256 public constant FUNDING_POINTS_DIVISOR = 100000;
     uint256 public constant MIN_FUNDING_INTERVAL = 30 minutes;
 
-    address public bullToken;
-    address public bearToken;
+    address public override bullToken;
+    address public override bearToken;
     address public priceFeed;
     uint256 public multiplierBasisPoints;
     uint256 public maxProfitBasisPoints;
@@ -291,7 +291,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return (true, uint256(price));
     }
 
-    function latestPrice() public view returns (uint256) {
+    function latestPrice() public override view returns (uint256) {
         int256 answer = IX2PriceFeed(priceFeed).latestAnswer();
         // avoid negative, zero or overflow values being returned
         if (answer <= 0 || answer > MAX_PRICE) {
@@ -304,7 +304,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return IX2PriceFeed(priceFeed).latestRound();
     }
 
-    function getDivisors(uint256 _lastPrice, uint256 _nextPrice) public view returns (uint256, uint256) {
+    function getDivisors(uint256 _lastPrice, uint256 _nextPrice) public override view returns (uint256, uint256) {
         uint256 bullRefSupply = IX2Token(bullToken)._totalSupply();
         uint256 bearRefSupply = IX2Token(bearToken)._totalSupply();
 
