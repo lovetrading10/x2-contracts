@@ -12,7 +12,7 @@ import "../interfaces/IX2Fund.sol";
 contract BurnVault is ReentrancyGuard, IERC20 {
     using SafeMath for uint256;
 
-    uint256 constant PRECISION = 1e20;
+    uint256 constant PRECISION = 1e30;
 
     address public token;
     address public floor;

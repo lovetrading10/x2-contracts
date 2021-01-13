@@ -10,7 +10,6 @@ import "./interfaces/IX2ETHFactory.sol";
 import "./interfaces/IX2PriceFeed.sol";
 import "./interfaces/IX2Token.sol";
 import "./interfaces/IX2Market.sol";
-import "./interfaces/IChi.sol";
 
 contract X2ETHMarket is ReentrancyGuard, IX2Market {
     using SafeMath for uint256;
@@ -49,7 +48,6 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint256 public feeReserve;
 
     address public factory;
-    IChi public chi;
 
     uint256 public fundingPoints;
     uint256 public fundingInterval;
@@ -64,14 +62,6 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     modifier onlyFactory() {
         require(msg.sender == factory, "X2ETHMarket: forbidden");
         _;
-    }
-
-    modifier discountCHI {
-        uint256 gasStart = gasleft();
-        _;
-        uint256 gasSpent = 21000 + gasStart - gasleft() + 16 *
-                           msg.data.length;
-        chi.freeFromUpTo(msg.sender, (gasSpent + 14154) / 41947);
     }
 
     function initialize(
@@ -115,15 +105,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         previousBearDivisor = INITIAL_REBASE_DIVISOR;
     }
 
-    function setChi(IChi _chi) public onlyFactory {
-        chi = _chi;
-    }
-
     function buy(address _token, address _receiver) public payable nonReentrant returns (uint256) {
-        return _buy(_token, _receiver);
-    }
-
-    function buyUsingChi(address _token, address _receiver) public payable nonReentrant discountCHI returns (uint256) {
         return _buy(_token, _receiver);
     }
 
@@ -131,16 +113,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return _sell(_token, _amount, _receiver, true);
     }
 
-    function sellUsingChi(address _token, uint256 _amount, address _receiver) public nonReentrant discountCHI returns (uint256) {
-        return _sell(_token, _amount, _receiver, true);
-    }
-
     function sellAll(address _token, address _receiver) public nonReentrant returns (uint256) {
-        uint256 amount = IERC20(_token).balanceOf(msg.sender);
-        return _sell(_token, amount, _receiver, true);
-    }
-
-    function sellAllUsingChi(address _token, address _receiver) public nonReentrant discountCHI returns (uint256) {
         uint256 amount = IERC20(_token).balanceOf(msg.sender);
         return _sell(_token, amount, _receiver, true);
     }
@@ -152,6 +125,15 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     // is set to an address that intentionally fails when `distribute` is called
     function sellWithoutDistribution(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
         return _sell(_token, _amount, _receiver, false);
+    }
+
+    function flip(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
+        return _flip(_token, _amount, _receiver);
+    }
+
+    function flipAll(address _token, address _receiver) public nonReentrant returns (uint256) {
+        uint256 amount = IERC20(_token).balanceOf(msg.sender);
+        return _flip(_token, amount, _receiver);
     }
 
     function rebase() public returns (bool) {
@@ -389,6 +371,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     }
 
     function _sell(address _token, uint256 _amount, address _receiver, bool distribute) private returns (uint256) {
+        require(_amount > 0, "X2ETHMarket: insufficient amount");
         require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
         rebase();
 
@@ -400,5 +383,28 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         require(success, "X2ETHMarket: transfer failed");
 
         return withdrawAmount;
+    }
+
+    function _flip(address _token, uint256 _amount, address _receiver) private returns (uint256) {
+        require(_amount > 0, "X2ETHMarket: insufficient amount");
+
+        bool isBull = _token == bullToken;
+        require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
+        rebase();
+
+        IX2Token(_token).burn(msg.sender, _amount, true);
+
+        uint256 fee = _collectFees(_amount);
+        uint256 flipAmount = _amount.sub(fee);
+
+        // if bull tokens were burnt then mint bear tokens
+        // if bear tokens were burnt then mint bull tokens
+        IX2Token(isBull ? bearToken : bullToken).mint(
+            _receiver,
+            flipAmount,
+            isBull ? cachedBullDivisor : cachedBearDivisor
+        );
+
+        return flipAmount;
     }
 }

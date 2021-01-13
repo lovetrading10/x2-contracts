@@ -102,19 +102,6 @@ describe("X2ETHFactory", function () {
     expect(await bearToken.symbol()).eq("X2:BEAR")
   })
 
-  it("setChi", async () => {
-    expect(await factory.gov()).eq(wallet.address)
-    await expect(factory.connect(user0).setChi(market.address, bullToken.address))
-      .to.be.revertedWith("X2Factory: forbidden")
-
-    await factory.setGov(user0.address)
-    expect(await factory.gov()).eq(user0.address)
-
-    expect(await market.chi()).eq(ethers.constants.AddressZero)
-    await factory.connect(user0).setChi(market.address, bullToken.address)
-    expect(await market.chi()).eq(bullToken.address)
-  })
-
   it("setGov", async () => {
     expect(await factory.gov()).eq(wallet.address)
     await expect(factory.connect(user0).setGov(user0.address))

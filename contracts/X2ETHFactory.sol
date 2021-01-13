@@ -6,7 +6,6 @@ import "./libraries/math/SafeMath.sol";
 
 import "./interfaces/IX2ETHFactory.sol";
 import "./interfaces/IX2Token.sol";
-import "./interfaces/IChi.sol";
 
 import "./X2ETHMarket.sol";
 import "./X2Token.sol";
@@ -79,10 +78,6 @@ contract X2ETHFactory is IX2ETHFactory {
         IX2Token(_bearToken).setInfo(_bearName, _bearSymbol);
         emit InfoChange(_bullToken, _bullName, _bullSymbol);
         emit InfoChange(_bearToken, _bearName, _bearSymbol);
-    }
-
-    function setChi(address _market, IChi _chi) external onlyGov {
-        X2ETHMarket(_market).setChi(_chi);
     }
 
     function setGov(address _gov) external onlyGov {
