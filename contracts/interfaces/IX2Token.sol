@@ -3,6 +3,7 @@
 pragma solidity 0.6.12;
 
 interface IX2Token {
+    function cumulativeRewardPerToken() external view returns (uint256);
     function distributor() external view returns (address);
     function _totalSupply() external view returns (uint256);
     function _balanceOf(address account) external view returns (uint256);
