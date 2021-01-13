@@ -1,7 +1,7 @@
 const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
 const { loadXvixFixtures, deployContract } = require("../shared/fixtures")
-const { expandDecimals, increaseTime, mineBlock, getNetworkFee } = require("../shared/utilities")
+const { expandDecimals, increaseTime, mineBlock, getNetworkFee, reportGasUsed } = require("../shared/utilities")
 
 use(solidity)
 
@@ -78,7 +78,8 @@ describe("BurnVault", function () {
     await xvix.transfer(user0.address, 1000)
     expect(await xvix.balanceOf(user0.address)).eq(995)
 
-    await vault.connect(user0).deposit(100)
+    const tx = await vault.connect(user0).deposit(100)
+    await reportGasUsed(provider, tx, "deposit gas used")
 
     expect(await xvix.balanceOf(user0.address)).eq(895)
     expect(await xvix.balanceOf(vault.address)).eq(100)
@@ -217,7 +218,8 @@ describe("BurnVault", function () {
     expect(await vault.totalSupply()).eq(balance0.add(balance2))
     expect(await vault.toBurn()).eq(burn0.add(burn2))
 
-    await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
+    const tx = await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
+    await reportGasUsed(provider, tx, "withdraw gas used")
     expect(await vault.balanceOf(user0.address), "0")
     expect(await xvix.balanceOf(user0.address), "198602041229783759303")
 

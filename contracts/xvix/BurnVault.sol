@@ -46,6 +46,8 @@ contract BurnVault is ReentrancyGuard, IERC20 {
         gov = msg.sender;
     }
 
+    receive() external payable {}
+
     function setGov(address _gov) external onlyGov {
         gov = _gov;
         emit GovChange(_gov);
