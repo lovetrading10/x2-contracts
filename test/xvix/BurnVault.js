@@ -233,7 +233,7 @@ describe("BurnVault", function () {
     expect(await xvix.balanceOf(vault.address)).eq(burn0.add(burn2))
   })
 
-  it("distribute", async () => {
+  it("refund", async () => {
     const receiver = { address: "0xe7eeefb2ea428a35c509854ff0a25a46f6724fbb" }
     await xvix.transfer(user0.address, expandDecimals(200, 18))
     expect(await xvix.balanceOf(user0.address)).eq(expandDecimals(199, 18))
@@ -298,11 +298,11 @@ describe("BurnVault", function () {
 
     await wallet.sendTransaction({ to: floor.address, value: expandDecimals(1000, 18) })
     const refundAmount = await floor.getRefundAmount(burn0.add(burn2))
-    await expect(vault.connect(user2).distribute(receiver.address)).to.be.revertedWith("BurnVault: forbidden")
+    await expect(vault.connect(user2).refund(receiver.address)).to.be.revertedWith("BurnVault: forbidden")
 
     await vault.addSender(user2.address)
     expect(await provider.getBalance(receiver.address)).eq(0)
-    await vault.connect(user2).distribute(receiver.address)
+    await vault.connect(user2).refund(receiver.address)
     expect(await provider.getBalance(receiver.address)).eq(refundAmount)
 
     await vault.connect(user0).withdraw(user0.address, "198602041229783759303")

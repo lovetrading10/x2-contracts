@@ -55,8 +55,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     mapping(address => Reward) public rewards;
     // track overall cumulative rewards
     uint256 public override cumulativeRewardPerToken;
-    // track total rewards
-    uint256 public totalRewards;
 
     bool public isInitialized;
 
