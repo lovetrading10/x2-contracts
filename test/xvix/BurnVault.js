@@ -33,19 +33,6 @@ describe("BurnVault", function () {
     expect(await vault.gov()).eq(user1.address)
   })
 
-  it("setDistributor", async () => {
-    expect(await vault.gov()).eq(wallet.address)
-    await expect(vault.connect(user0).setDistributor(user1.address))
-      .to.be.revertedWith("BurnVault: forbidden")
-
-    await vault.setGov(user0.address)
-    expect(await vault.gov()).eq(user0.address)
-
-    expect(await vault.distributor()).eq(ethers.constants.AddressZero)
-    await vault.connect(user0).setDistributor(user1.address)
-    expect(await vault.distributor()).eq(user1.address)
-  })
-
   it("addSender", async () => {
     expect(await vault.gov()).eq(wallet.address)
     await expect(vault.connect(user0).addSender(user1.address))
@@ -247,6 +234,7 @@ describe("BurnVault", function () {
   })
 
   it("distribute", async () => {
+    const receiver = { address: "0xe7eeefb2ea428a35c509854ff0a25a46f6724fbb" }
     await xvix.transfer(user0.address, expandDecimals(200, 18))
     expect(await xvix.balanceOf(user0.address)).eq(expandDecimals(199, 18))
     await xvix.transfer(user1.address, expandDecimals(200, 18))
@@ -310,19 +298,12 @@ describe("BurnVault", function () {
 
     await wallet.sendTransaction({ to: floor.address, value: expandDecimals(1000, 18) })
     const refundAmount = await floor.getRefundAmount(burn0.add(burn2))
-    await expect(vault.distribute()).to.be.revertedWith("BurnVault: forbidden")
-    const distributor = await deployContract("X2Distributor", [vault.address])
-    await expect(distributor.distribute(user2.address, 0))
-      .to.be.revertedWith("X2Distributor: forbidden")
-    await vault.addSender(user2.address)
-    await vault.setDistributor(distributor.address)
-    const beforeBalance = await provider.getBalance(user2.address)
-    const tx = await vault.connect(user2).distribute()
-    const networkFee = await getNetworkFee(provider, tx)
+    await expect(vault.connect(user2).distribute(receiver.address)).to.be.revertedWith("BurnVault: forbidden")
 
-    const receivedETH = (await provider.getBalance(user2.address)).sub(beforeBalance)
-    expect(await vault.toBurn()).eq(0)
-    expect(receivedETH.add(networkFee)).eq(refundAmount.div(2))
+    await vault.addSender(user2.address)
+    expect(await provider.getBalance(receiver.address)).eq(0)
+    await vault.connect(user2).distribute(receiver.address)
+    expect(await provider.getBalance(receiver.address)).eq(refundAmount)
 
     await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
     expect(await vault.balanceOf(user0.address), "0")

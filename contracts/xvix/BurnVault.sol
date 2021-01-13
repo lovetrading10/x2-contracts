@@ -14,7 +14,6 @@ contract BurnVault is ReentrancyGuard {
 
     address public token;
     address public floor;
-    address public distributor;
     address public gov;
 
     uint256 public initialDivisor;
@@ -26,7 +25,6 @@ contract BurnVault is ReentrancyGuard {
     event Deposit(address account, uint256 amount);
     event Withdraw(address account, uint256 amount);
     event GovChange(address gov);
-    event DistributorChange(address distributor);
 
     modifier onlyGov() {
         require(msg.sender == gov, "BurnVault: forbidden");
@@ -43,11 +41,6 @@ contract BurnVault is ReentrancyGuard {
     function setGov(address _gov) public onlyGov {
         gov = _gov;
         emit GovChange(_gov);
-    }
-
-    function setDistributor(address _distributor) public onlyGov {
-        distributor = _distributor;
-        emit DistributorChange(_distributor);
     }
 
     function addSender(address _sender) external onlyGov {
@@ -86,24 +79,21 @@ contract BurnVault is ReentrancyGuard {
         emit Withdraw(account, _amount);
     }
 
-    function distribute() external nonReentrant returns (uint256) {
+    function distribute(address _receiver) external nonReentrant returns (uint256) {
         require(senders[msg.sender], "BurnVault: forbidden");
-        address _distributor = distributor;
-
-        address receiver = msg.sender;
 
         uint256 _toBurn = toBurn();
         if (_toBurn == 0) {
-            return IX2Distributor(_distributor).distribute(receiver, 0);
+            return 0;
         }
 
         uint256 refundAmount = IFloor(floor).getRefundAmount(_toBurn);
         if (refundAmount == 0) {
-            return IX2Distributor(_distributor).distribute(receiver, 0);
+            return 0;
         }
 
-        uint256 ethAmount = IFloor(floor).refund(_distributor, _toBurn);
-        return IX2Distributor(_distributor).distribute(receiver, ethAmount);
+        uint256 ethAmount = IFloor(floor).refund(_receiver, _toBurn);
+        return ethAmount;
     }
 
     function totalSupply() public view returns (uint256) {
