@@ -99,6 +99,7 @@ describe("BurnVault", function () {
   })
 
   it("reduces burns", async () => {
+    await xvix.rebase()
     await xvix.transfer(user0.address, expandDecimals(200, 18))
     expect(await xvix.balanceOf(user0.address)).eq(expandDecimals(199, 18))
     await xvix.transfer(user1.address, expandDecimals(200, 18))
@@ -108,7 +109,7 @@ describe("BurnVault", function () {
     await vault.connect(user0).deposit(expandDecimals(199, 18))
 
     expect(await xvix.balanceOf(user0.address)).eq(0)
-    expect(await vault.balanceOf(user0.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user0.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(user1.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(199, 18))
 
@@ -135,7 +136,7 @@ describe("BurnVault", function () {
     await xvix.connect(user2).approve(vault.address, expandDecimals(199, 18))
     await vault.connect(user2).deposit(expandDecimals(199, 18))
     expect(await xvix.balanceOf(user2.address)).eq(0)
-    expect(await vault.balanceOf(user2.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user2.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(398, 18))
 
     await increaseTime(provider, 20 * 60 * 60) // 20 hours
@@ -161,14 +162,15 @@ describe("BurnVault", function () {
     expect(await vault.toBurn()).eq(burn0.add(burn2))
 
     await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
-    expect(await vault.balanceOf(user0.address), "0")
-    expect(await xvix.balanceOf(user0.address), "198602041229783759303")
+    expect(await vault.balanceOf(user0.address)).eq("0")
+    expect(await xvix.balanceOf(user0.address)).eq("198602041229783759303")
 
     expect(await vault.totalSupply()).eq(balance2)
     expect(await vault.toBurn()).eq(burn0.add(burn2))
   })
 
   it("withdraw", async () => {
+    await xvix.rebase()
     await xvix.transfer(user0.address, expandDecimals(200, 18))
     expect(await xvix.balanceOf(user0.address)).eq(expandDecimals(199, 18))
     await xvix.transfer(user1.address, expandDecimals(200, 18))
@@ -178,7 +180,7 @@ describe("BurnVault", function () {
     await vault.connect(user0).deposit(expandDecimals(199, 18))
 
     expect(await xvix.balanceOf(user0.address)).eq(0)
-    expect(await vault.balanceOf(user0.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user0.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(user1.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(199, 18))
 
@@ -205,7 +207,7 @@ describe("BurnVault", function () {
     await xvix.connect(user2).approve(vault.address, expandDecimals(199, 18))
     await vault.connect(user2).deposit(expandDecimals(199, 18))
     expect(await xvix.balanceOf(user2.address)).eq(0)
-    expect(await vault.balanceOf(user2.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user2.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(398, 18))
 
     await increaseTime(provider, 20 * 60 * 60) // 20 hours
@@ -232,15 +234,15 @@ describe("BurnVault", function () {
 
     const tx = await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
     await reportGasUsed(provider, tx, "withdraw gas used")
-    expect(await vault.balanceOf(user0.address), "0")
-    expect(await xvix.balanceOf(user0.address), "198602041229783759303")
+    expect(await vault.balanceOf(user0.address)).eq("0")
+    expect(await xvix.balanceOf(user0.address)).eq("198602041229783759303")
 
     expect(await vault.totalSupply()).eq(balance2)
     expect(await vault.toBurn()).eq(burn0.add(burn2))
 
     await vault.connect(user2).withdraw(user2.address, "198800822012850649867")
-    expect(await vault.balanceOf(user2.address), "0")
-    expect(await xvix.balanceOf(user2.address), "198800822012850649867")
+    expect(await vault.balanceOf(user2.address)).eq("0")
+    expect(await xvix.balanceOf(user2.address)).eq("198800822012850649867")
 
     expect(await vault.totalSupply()).eq(0)
     expect(await vault.toBurn()).eq(burn0.add(burn2))
@@ -248,6 +250,7 @@ describe("BurnVault", function () {
   })
 
   it("refund", async () => {
+    await xvix.rebase()
     const receiver = { address: "0xe7eeefb2ea428a35c509854ff0a25a46f6724fbb" }
     await xvix.transfer(user0.address, expandDecimals(200, 18))
     expect(await xvix.balanceOf(user0.address)).eq(expandDecimals(199, 18))
@@ -258,7 +261,7 @@ describe("BurnVault", function () {
     await vault.connect(user0).deposit(expandDecimals(199, 18))
 
     expect(await xvix.balanceOf(user0.address)).eq(0)
-    expect(await vault.balanceOf(user0.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user0.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(user1.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(199, 18))
 
@@ -285,7 +288,7 @@ describe("BurnVault", function () {
     await xvix.connect(user2).approve(vault.address, expandDecimals(199, 18))
     await vault.connect(user2).deposit(expandDecimals(199, 18))
     expect(await xvix.balanceOf(user2.address)).eq(0)
-    expect(await vault.balanceOf(user2.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user2.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(398, 18))
 
     await increaseTime(provider, 20 * 60 * 60) // 20 hours
@@ -320,7 +323,7 @@ describe("BurnVault", function () {
     expect(await provider.getBalance(receiver.address)).eq(refundAmount)
 
     await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
-    expect(await vault.balanceOf(user0.address), "0")
+    expect(await vault.balanceOf(user0.address)).eq("0")
     expect(await xvix.balanceOf(user0.address), "198602041229783759303")
 
     await increaseTime(provider, 20 * 60 * 60) // 20 hours
@@ -331,6 +334,8 @@ describe("BurnVault", function () {
   })
 
   it("stake", async () => {
+    await xvix.rebase()
+
     const receiver0 = newWallet()
     const receiver1 = newWallet()
     const receiver2 = newWallet()
@@ -348,7 +353,7 @@ describe("BurnVault", function () {
     await vault.connect(user0).deposit(expandDecimals(199, 18))
 
     expect(await xvix.balanceOf(user0.address)).eq(0)
-    expect(await vault.balanceOf(user0.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user0.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(user1.address)).eq(expandDecimals(398, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(199, 18))
 
@@ -374,8 +379,8 @@ describe("BurnVault", function () {
     await xvix.connect(user1).approve(vault.address, expandDecimals(199, 18))
     await vault.connect(user1).deposit(expandDecimals(199, 18))
 
-    expect(await vault.balanceOf(user0.address), "198781122106448589458")
-    expect(await vault.balanceOf(user1.address), expandDecimals(199, 18))
+    expect(await vault.balanceOf(user0.address)).eq("198781122106448589458")
+    expect(await vault.balanceOf(user1.address)).eq(expandDecimals(199, 18))
     expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(398, 18))
 
     expect(await provider.getBalance(receiver1.address)).eq(0)
@@ -420,8 +425,8 @@ describe("BurnVault", function () {
     await vault.connect(user0).deposit(expandDecimals(199, 18))
 
     expect(await xvix.balanceOf(user0.address)).eq(0)
-    expect(await xvix.balanceOf(vault.address), expandDecimals(199, 18))
-    expect(await vault.balanceOf(user0.address), expandDecimals(199, 18))
+    expect(await xvix.balanceOf(vault.address)).eq(expandDecimals(199, 18))
+    expect(await vault.balanceOf(user0.address)).eq(expandDecimals(199, 18))
 
     await vault.setDistributor(user0.address)
 
@@ -430,7 +435,7 @@ describe("BurnVault", function () {
 
     await vault.connect(user0).withdrawWithoutDistribution(user0.address, expandDecimals(199, 18))
     expect(await xvix.balanceOf(user0.address)).eq(expandDecimals(199, 18))
-    expect(await xvix.balanceOf(vault.address), 0)
-    expect(await vault.balanceOf(user0.address), 0)
+    expect(await xvix.balanceOf(vault.address)).eq(0)
+    expect(await vault.balanceOf(user0.address)).eq(0)
   })
 })
