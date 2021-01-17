@@ -1,5 +1,9 @@
 const maxUint256 = ethers.constants.MaxUint256
 
+function newWallet() {
+  return ethers.Wallet.createRandom()
+}
+
 function bigNumberify(n) {
   return ethers.BigNumber.from(n)
 }
@@ -49,6 +53,7 @@ async function getTxnBalances(provider, user, txn, callback) {
 }
 
 module.exports = {
+  newWallet,
   maxUint256,
   bigNumberify,
   expandDecimals,

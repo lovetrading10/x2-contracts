@@ -153,6 +153,6 @@ contract Farm is ReentrancyGuard, IERC20 {
         );
 
         claimableReward[_account] = _claimableReward;
-        previousCumulatedRewardPerToken[_account] = _previousCumulatedReward;
+        previousCumulatedRewardPerToken[_account] = _cumulativeRewardPerToken;
     }
 }
