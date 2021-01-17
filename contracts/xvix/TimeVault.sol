@@ -35,6 +35,7 @@ contract TimeVault is ITimeVault, IERC20, ReentrancyGuard {
     event Deposit(address account, uint256 amount);
     event BeginWithdrawal(address account, uint256 amount);
     event Withdraw(address account, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 value);
     event GovChange(address gov);
     event Claim(address receiver, uint256 amount);
 
@@ -69,6 +70,7 @@ contract TimeVault is ITimeVault, IERC20, ReentrancyGuard {
         totalSupply = totalSupply.add(_amount);
 
         emit Deposit(account, _amount);
+        emit Transfer(address(0), account, _amount);
     }
 
     function beginWithdrawal(uint256 _amount) external nonReentrant {
@@ -163,6 +165,7 @@ contract TimeVault is ITimeVault, IERC20, ReentrancyGuard {
         IERC20(token).transfer(_receiver, amount);
 
         emit Withdraw(_account, amount);
+        emit Transfer(_account, address(0), amount);
     }
 
     function _increaseWithdrawalSlot(uint256 _time, uint256 _amount) private {

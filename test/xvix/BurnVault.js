@@ -232,6 +232,9 @@ describe("BurnVault", function () {
     expect(await vault.totalSupply()).eq(balance0.add(balance2))
     expect(await vault.toBurn()).eq(burn0.add(burn2))
 
+    await expect(vault.connect(user0).withdraw(user0.address, expandDecimals(199, 18)))
+      .to.be.revertedWith("BurnVault: insufficient balance")
+
     const tx = await vault.connect(user0).withdraw(user0.address, "198602041229783759303")
     await reportGasUsed(provider, tx, "withdraw gas used")
     expect(await vault.balanceOf(user0.address)).eq("0")

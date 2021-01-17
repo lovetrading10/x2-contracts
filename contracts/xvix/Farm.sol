@@ -26,6 +26,7 @@ contract Farm is ReentrancyGuard, IERC20 {
 
     event Deposit(address account, uint256 amount);
     event Withdraw(address account, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 value);
     event GovChange(address gov);
     event Claim(address receiver, uint256 amount);
 
@@ -62,6 +63,7 @@ contract Farm is ReentrancyGuard, IERC20 {
         totalSupply = totalSupply.add(_amount);
 
         emit Deposit(account, _amount);
+        emit Transfer(address(0), account, _amount);
     }
 
     function withdraw(address _receiver, uint256 _amount) external nonReentrant {
@@ -118,12 +120,15 @@ contract Farm is ReentrancyGuard, IERC20 {
     }
 
     function _withdraw(address _account, address _receiver, uint256 _amount) private {
+        require(balances[_account] >= _amount, "Farm: insufficient balance");
+
         balances[_account] = balances[_account].sub(_amount);
         totalSupply = totalSupply.sub(_amount);
 
         IERC20(token).transfer(_receiver, _amount);
 
         emit Withdraw(_account, _amount);
+        emit Transfer(_account, address(0), _amount);
     }
 
     function _updateRewards(address _account, bool _distribute) private {
