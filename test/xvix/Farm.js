@@ -42,50 +42,67 @@ describe("Farm", function () {
   })
 
   it("deposit", async () => {
-    await expect(farm.connect(user0).deposit(0))
+    await expect(farm.connect(user0).deposit(0, user1.address))
       .to.be.revertedWith("Farm: insufficient amount")
-    await expect(farm.connect(user0).deposit(100))
+    await expect(farm.connect(user0).deposit(100, user1.address))
       .to.be.revertedWith("ERC20: transfer amount exceeds balance")
 
     await weth.connect(user0).approve(farm.address, 100)
-    await expect(farm.connect(user0).deposit(100))
+    await expect(farm.connect(user0).deposit(100, user1.address))
       .to.be.revertedWith("ERC20: transfer amount exceeds balance")
 
     await weth.transfer(user0.address, 1000)
     expect(await weth.balanceOf(user0.address)).eq(1000)
 
-    const tx = await farm.connect(user0).deposit(100)
+    const tx = await farm.connect(user0).deposit(100, user1.address)
     await reportGasUsed(provider, tx, "deposit gas used")
 
     expect(await weth.balanceOf(user0.address)).eq(900)
     expect(await weth.balanceOf(farm.address)).eq(100)
-    expect(await farm.balanceOf(user0.address)).eq(100)
+    expect(await farm.balanceOf(user0.address)).eq(0)
+    expect(await farm.balanceOf(user1.address)).eq(100)
+
+    await farm.connect(user1).withdraw(user2.address, 100)
+
+    expect(await weth.balanceOf(user0.address)).eq(900)
+    expect(await weth.balanceOf(user1.address)).eq(0)
+    expect(await weth.balanceOf(user2.address)).eq(100)
+    expect(await weth.balanceOf(farm.address)).eq(0)
+    expect(await farm.balanceOf(user0.address)).eq(0)
+    expect(await farm.balanceOf(user1.address)).eq(0)
+    expect(await farm.balanceOf(user2.address)).eq(0)
   })
 
   it("withdraw", async () => {
-    await expect(farm.connect(user0).deposit(0))
+    await expect(farm.connect(user0).deposit(0, user0.address))
       .to.be.revertedWith("Farm: insufficient amount")
-    await expect(farm.connect(user0).deposit(100))
+    await expect(farm.connect(user0).deposit(100, user0.address))
       .to.be.revertedWith("ERC20: transfer amount exceeds balance")
 
     await weth.connect(user0).approve(farm.address, 100)
-    await expect(farm.connect(user0).deposit(100))
+    await expect(farm.connect(user0).deposit(100, user0.address))
       .to.be.revertedWith("ERC20: transfer amount exceeds balance")
 
     await weth.transfer(user0.address, 1000)
     expect(await weth.balanceOf(user0.address)).eq(1000)
 
-    await farm.connect(user0).deposit(100)
+    await farm.connect(user0).deposit(100, user0.address)
 
     expect(await weth.balanceOf(user0.address)).eq(900)
     expect(await weth.balanceOf(farm.address)).eq(100)
     expect(await farm.balanceOf(user0.address)).eq(100)
 
-    await expect(farm.connect(user0).withdraw(user0.address, 101))
+    const tx = await farm.connect(user0).withdraw(user0.address, 50)
+    await reportGasUsed(provider, tx, "withdraw gas used")
+
+    expect(await weth.balanceOf(user0.address)).eq(950)
+    expect(await weth.balanceOf(farm.address)).eq(50)
+    expect(await farm.balanceOf(user0.address)).eq(50)
+
+    await expect(farm.connect(user0).withdraw(user0.address, 51))
       .to.be.revertedWith("Farm: insufficient balance")
 
-    const tx = await farm.connect(user0).withdraw(user0.address, 100)
-    await reportGasUsed(provider, tx, "withdraw gas used")
+    await farm.connect(user0).withdraw(user0.address, 50)
 
     expect(await weth.balanceOf(user0.address)).eq(1000)
     expect(await weth.balanceOf(farm.address)).eq(0)
@@ -108,7 +125,7 @@ describe("Farm", function () {
     expect(await weth.balanceOf(user1.address)).eq(expandDecimals(200, 18))
 
     await weth.connect(user0).approve(farm.address, expandDecimals(200, 18))
-    await farm.connect(user0).deposit(expandDecimals(200, 18))
+    await farm.connect(user0).deposit(expandDecimals(200, 18), user0.address)
 
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await farm.balanceOf(user0.address)).eq(expandDecimals(200, 18))
@@ -133,7 +150,7 @@ describe("Farm", function () {
 
     await wallet.sendTransaction({ to: distributor.address, value: expandDecimals(1, 18) })
     await weth.connect(user1).approve(farm.address, expandDecimals(200, 18))
-    await farm.connect(user1).deposit(expandDecimals(200, 18))
+    await farm.connect(user1).deposit(expandDecimals(200, 18), user1.address)
 
     expect(await farm.balanceOf(user0.address)).eq(expandDecimals(200, 18))
     expect(await farm.balanceOf(user1.address)).eq(expandDecimals(200, 18))
@@ -177,7 +194,7 @@ describe("Farm", function () {
     expect(await weth.balanceOf(user0.address)).eq(expandDecimals(200, 18))
 
     await weth.connect(user0).approve(farm.address, expandDecimals(200, 18))
-    await farm.connect(user0).deposit(expandDecimals(200, 18))
+    await farm.connect(user0).deposit(expandDecimals(200, 18), user0.address)
 
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await weth.balanceOf(farm.address)).eq(expandDecimals(200, 18))

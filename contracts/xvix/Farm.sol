@@ -51,19 +51,18 @@ contract Farm is ReentrancyGuard, IERC20 {
         distributor = _distributor;
     }
 
-    function deposit(uint256 _amount) external nonReentrant {
+    function deposit(uint256 _amount, address _receiver) external nonReentrant {
         require(_amount > 0, "Farm: insufficient amount");
 
-        address account = msg.sender;
-        _updateRewards(account, true);
+        _updateRewards(_receiver, true);
 
-        IERC20(token).transferFrom(account, address(this), _amount);
+        IERC20(token).transferFrom(msg.sender, address(this), _amount);
 
-        balances[account] = balances[account].add(_amount);
+        balances[_receiver] = balances[_receiver].add(_amount);
         totalSupply = totalSupply.add(_amount);
 
-        emit Deposit(account, _amount);
-        emit Transfer(address(0), account, _amount);
+        emit Deposit(_receiver, _amount);
+        emit Transfer(address(0), _receiver, _amount);
     }
 
     function withdraw(address _receiver, uint256 _amount) external nonReentrant {
