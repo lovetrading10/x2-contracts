@@ -10,6 +10,10 @@ import "../interfaces/IX2Fund.sol";
 contract Farm is ReentrancyGuard, IERC20 {
     using SafeMath for uint256;
 
+    string public constant name = "XVIX Farm";
+    string public constant symbol = "XVIX:FARM";
+    uint8 public constant decimals = 18;
+
     uint256 constant PRECISION = 1e30;
 
     address public token;

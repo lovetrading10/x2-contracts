@@ -12,6 +12,10 @@ import "../interfaces/IX2Fund.sol";
 contract TimeVault is ITimeVault, IERC20, ReentrancyGuard {
     using SafeMath for uint256;
 
+    string public constant name = "XVIX TimeVault";
+    string public constant symbol = "XVIX:TV";
+    uint8 public constant decimals = 18;
+
     uint256 constant PRECISION = 1e30;
 
     uint256 public constant WITHDRAWAL_DELAY = 7 days;

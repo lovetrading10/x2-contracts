@@ -12,6 +12,10 @@ import "../interfaces/IX2Fund.sol";
 contract BurnVault is ReentrancyGuard, IERC20 {
     using SafeMath for uint256;
 
+    string public constant name = "XVIX BurnVault";
+    string public constant symbol = "XVIX:BV";
+    uint8 public constant decimals = 18;
+
     uint256 constant PRECISION = 1e30;
 
     address public token;
