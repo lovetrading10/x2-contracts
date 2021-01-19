@@ -17,5 +17,8 @@
     "ethereum-waffle": "^3.2.1",
     "ethers": "^5.0.24",
     "hardhat": "^2.0.4"
+  },
+  "dependencies": {
+    "@poanet/solidity-flattener": "^3.0.6"
   }
 }

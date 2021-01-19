@@ -1,10 +1,8 @@
 const { deployContract, contractAt, sendTxn } = require("./helpers")
 
 async function main() {
-  const xvix = await contractAt("XVIX", "0x4bAE380B5D762D543d426331b8437926443ae9ec")
-  const vault = await deployContract("Farm", [xvix.address])
-  await sendTxn(xvix.createSafe(vault.address), "xvix.createSafe")
-  await sendTxn(xvix.setTransferConfig(vault.address, 0, 0, 0, 0), "xvix.setTransferConfig")
+  const xvixEthUni = { address: "0x619aAa52a10F196e521F823aeD4CdeA30D45D366" }
+  const vault = await deployContract("Farm", [xvixEthUni.address])
 
   return { vault }
 }
