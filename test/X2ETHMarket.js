@@ -15,6 +15,7 @@ describe("X2ETHMarket", function () {
   let market
   let bullToken
   let bearToken
+  let rewardToken
   let xvix
   let floor
   let distributor
@@ -34,13 +35,14 @@ describe("X2ETHMarket", function () {
     xvix = xvixFixtures.xvix
     floor = xvixFixtures.floor
 
-    distributor = await deployContract("X2TimeDistributor", [])
+    rewardToken = await deployContract("X2FeeSplit", ["3X ETH/USD X2 FS", "X2FS", expandDecimals(50000, 18)])
+    distributor = await deployContract("X2TokenDistributor", [])
 
-    await factory.setDistributor(bullToken.address, distributor.address)
-    await factory.setDistributor(bearToken.address, distributor.address)
+    await factory.setDistributor(bullToken.address, distributor.address, rewardToken.address)
+    await factory.setDistributor(bearToken.address, distributor.address, rewardToken.address)
 
     await wallet.sendTransaction({ to: distributor.address, value: expandDecimals(2, 18) })
-    await distributor.setDistribution([bullToken.address, bearToken.address], ["10000000000000000", "10000000000000000"]) // 0.01 ETH per hour
+    await distributor.setDistribution([bullToken.address, bearToken.address], ["10000000000000000", "10000000000000000"], [rewardToken.address, rewardToken.address]) // 0.01 ETH per hour
   })
 
   it("inits", async () => {
@@ -59,7 +61,7 @@ describe("X2ETHMarket", function () {
   it("gas usage", async () => {
     // first buy, this would have an extra cost to init the total supply
     // first buy for user0, would have an extra cost to init the user's balance
-    const tx0 = await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    const tx0 = await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     await reportGasUsed(provider, tx0, "tx0 buy gas used")
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
 
@@ -67,18 +69,18 @@ describe("X2ETHMarket", function () {
 
     // second buy, lower cost to update the total supply
     // second buy for user0, lower cost to update the user's balance
-    const tx1 = await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    const tx1 = await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     await reportGasUsed(provider, tx1, "tx1 buy gas used")
 
     // user0 buys a bear to initialise the bear side
-    const tx2 = await market.connect(user0).buy(bearToken.address, user0.address, { value: expandDecimals(10, 18) })
+    const tx2 = await market.connect(user0).buy(bearToken.address, { value: expandDecimals(10, 18) })
     await reportGasUsed(provider, tx2, "tx2 buy gas used")
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(1200))
 
     // first buy for user1 after a price change
     // some costs for rebasing
-    const tx3 = await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    const tx3 = await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     await reportGasUsed(provider, tx3, "tx3 buy gas used")
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
@@ -86,8 +88,11 @@ describe("X2ETHMarket", function () {
 
     // buy after two price changes
     // higher costs for checking two prices
-    const tx4 = await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    const tx4 = await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     await reportGasUsed(provider, tx4, "tx4 buy gas used")
+
+    await increaseTime(provider, 60 * 20)
+    await mineBlock(provider)
 
     // first sell
     const tx5 = await market.connect(user0).sell(bullToken.address, expandDecimals(1, 18), user0.address)
@@ -110,19 +115,19 @@ describe("X2ETHMarket", function () {
   })
 
   it("buy", async () =>{
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
   })
 
   it("rebases", async () =>{
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -166,11 +171,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("after 1 price increase", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -190,11 +195,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("after 2 price increases", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -211,11 +216,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("after 3 price increases", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -233,11 +238,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("after 1 price decrease", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -257,11 +262,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("after 2 price decreases", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -278,11 +283,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("after 3 price decreases", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -300,11 +305,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("after 1 price increase and 1 decrease", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -324,11 +329,11 @@ describe("X2ETHMarket", function () {
     const receiver0 = { address: "0xb3971133a949d45d222ea49f21817ade07516214" }
     const receiver1 = { address: "0xdc64ba27c5788f6dab963055a1dbe8989ffba5ca" }
 
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -356,11 +361,11 @@ describe("X2ETHMarket", function () {
     const receiver0 = { address: "0x1dbffbf7fa596050626f4b843a586ef6cb1f7973" }
     const receiver1 = { address: "0x4eeace20a47214e487e6352a0a8a601fff0ec768" }
 
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -387,11 +392,11 @@ describe("X2ETHMarket", function () {
   it("sellWithoutDistribution", async () => {
     const receiver0 = { address: "0x72c413e58c6a7f922e406bdc8396b98e04d0f7f4" }
 
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -418,12 +423,12 @@ describe("X2ETHMarket", function () {
   it("costOf", async () => {
     const receiver0 = { address: "0x5331fff36bf2e91f1461d37ffd37bdcb3c6a4ebc" }
 
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
     expect(await bullToken.costOf(user0.address)).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -445,7 +450,7 @@ describe("X2ETHMarket", function () {
     await market.connect(user0).sell(bullToken.address, "1000000000000000000", receiver0.address)
     expect(await bullToken.costOf(user0.address)).eq("3571428571300000000")
 
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.costOf(user0.address)).eq("13571428571300000000")
 
     await market.connect(user0).sellAll(bullToken.address, receiver0.address)
@@ -454,7 +459,7 @@ describe("X2ETHMarket", function () {
 
   it("distributeFees", async () => {
     await factory.setFee(market.address, 20)
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
     expect(await bullToken.totalSupply()).eq("9980000000000000000")
     expect(await bullToken.costOf(user0.address)).eq("9980000000000000000")
@@ -476,11 +481,11 @@ describe("X2ETHMarket", function () {
   })
 
   it("distributeInterest", async () => {
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(10, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(10, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(10, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -534,7 +539,7 @@ describe("X2ETHMarket", function () {
     expect(await market.fundingPoints()).eq(100)
     expect(await market.fundingInterval()).eq(30 * 60)
 
-    await market.connect(user0).buy(bullToken.address, user0.address, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq(expandDecimals(10, 18))
     expect(await bullToken.totalSupply()).eq(expandDecimals(10, 18))
 
@@ -542,7 +547,7 @@ describe("X2ETHMarket", function () {
     await mineBlock(provider)
 
     await priceFeed.setLatestAnswer(toChainlinkPrice(1000))
-    await market.connect(user1).buy(bearToken.address, user1.address, { value: expandDecimals(5, 18) })
+    await market.connect(user1).buy(bearToken.address, { value: expandDecimals(5, 18) })
     expect(await bearToken.balanceOf(user1.address)).eq(expandDecimals(5, 18))
     expect(await bearToken.totalSupply()).eq(expandDecimals(5, 18))
 

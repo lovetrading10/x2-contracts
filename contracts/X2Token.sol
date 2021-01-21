@@ -28,13 +28,16 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     // assuming a supply of only 1 wei of X2Tokens
     // so total rewards of up to 10^28 wei or 1 billion ETH is supported
     struct Reward {
-        uint128 claimable;
         uint128 previousCumulativeRewardPerToken;
+        uint96 claimable;
+        uint32 lastBoughtAt;
     }
 
+    uint256 constant HOLDING_TIME = 15 minutes;
     uint256 constant PRECISION = 1e20;
     uint256 constant MAX_BALANCE = uint128(-1);
-    uint256 constant MAX_REWARD = uint128(-1);
+    uint256 constant MAX_REWARD = uint96(-1);
+    uint256 constant MAX_CUMULATIVE_REWARD = uint128(-1);
 
     string public name = "X2";
     string public symbol = "X2";
@@ -46,6 +49,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     address public override market;
     address public factory;
     address public override distributor;
+    address public override rewardToken;
 
     // ledgers track balances and costs
     mapping (address => Ledger) public ledgers;
@@ -79,8 +83,9 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         market = _market;
     }
 
-    function setDistributor(address _distributor) external override onlyFactory {
+    function setDistributor(address _distributor, address _rewardToken) external override onlyFactory {
         distributor = _distributor;
+        rewardToken = _rewardToken;
     }
 
     function setInfo(string memory _name, string memory _symbol) external override onlyFactory {
@@ -124,20 +129,27 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     function claim(address _receiver) external nonReentrant {
         address _account = msg.sender;
         uint256 cachedTotalSupply = _totalSupply;
-        _updateRewards(_account, cachedTotalSupply, true);
+        _updateRewards(_account, cachedTotalSupply, true, false);
 
         Reward storage reward = rewards[_account];
         uint256 rewardToClaim = reward.claimable;
         reward.claimable = 0;
 
-        (bool success,) = _receiver.call{value: rewardToClaim}("");
-        require(success, "X2Token: transfer failed");
+        IERC20(rewardToken).transfer(_receiver, rewardToClaim);
 
         emit Claim(_receiver, rewardToClaim);
     }
 
     function getDivisor() public override view returns (uint256) {
         return IX2Market(market).getDivisor(address(this));
+    }
+
+    function lastBoughtAt(address _account) public view returns (uint256) {
+        return uint256(rewards[_account].lastBoughtAt);
+    }
+
+    function canTransfer(address _account) public view returns (bool) {
+        return lastBoughtAt(_account) < block.timestamp.sub(HOLDING_TIME);
     }
 
     function balanceOf(address _account) public view override returns (uint256) {
@@ -157,12 +169,13 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
+        require(canTransfer(_sender), "X2Token: holding time not yet passed");
         require(_sender != address(0), "X2Token: transfer from the zero address");
         require(_recipient != address(0), "X2Token: transfer to the zero address");
 
         uint256 divisor = getDivisor();
         _decreaseBalance(_sender, _amount, divisor, true);
-        _increaseBalance(_recipient, _amount, divisor);
+        _increaseBalance(_recipient, _amount, divisor, false);
 
         emit Transfer(_sender, _recipient, _amount);
     }
@@ -170,12 +183,13 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     function _mint(address _account, uint256 _amount, uint256 _divisor) private {
         require(_account != address(0), "X2Token: mint to the zero address");
 
-        _increaseBalance(_account, _amount, _divisor);
+        _increaseBalance(_account, _amount, _divisor, true);
 
         emit Transfer(address(0), _account, _amount);
     }
 
     function _burn(address _account, uint256 _amount, bool _distribute) private {
+        require(canTransfer(_account), "X2Token: holding time not yet passed");
         require(_account != address(0), "X2Token: burn from the zero address");
 
         uint256 divisor = getDivisor();
@@ -192,11 +206,11 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         emit Approval(_owner, _spender, _amount);
     }
 
-    function _increaseBalance(address _account, uint256 _amount, uint256 _divisor) private {
+    function _increaseBalance(address _account, uint256 _amount, uint256 _divisor, bool _updateLastBoughtAt) private {
         if (_amount == 0) { return; }
 
         uint256 cachedTotalSupply = _totalSupply;
-        _updateRewards(_account, cachedTotalSupply, true);
+        _updateRewards(_account, cachedTotalSupply, true, _updateLastBoughtAt);
 
         uint256 scaledAmount = _amount.mul(_divisor);
         Ledger memory ledger = ledgers[_account];
@@ -219,7 +233,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         if (_amount == 0) { return; }
 
         uint256 cachedTotalSupply = _totalSupply;
-        _updateRewards(_account, cachedTotalSupply, _distribute);
+        _updateRewards(_account, cachedTotalSupply, _distribute, false);
 
         uint256 scaledAmount = _amount.mul(_divisor);
         Ledger memory ledger = ledgers[_account];
@@ -239,8 +253,9 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _totalSupply = cachedTotalSupply.sub(scaledAmount);
     }
 
-    function _updateRewards(address _account, uint256 _cachedTotalSupply, bool _distribute) private {
+    function _updateRewards(address _account, uint256 _cachedTotalSupply, bool _distribute, bool _updateLastBoughtAt) private {
         uint256 blockReward;
+        Reward memory reward = rewards[_account];
 
         if (_distribute && distributor != address(0)) {
             blockReward = IX2Fund(distributor).distribute();
@@ -264,32 +279,25 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
 
-        // cumulativeRewardPerToken can only increase
-        // so if cumulativeRewardPerToken is zero, it means there are no rewards yet
-        // return if _cumulativeRewardPerToken > MAX_REWARD to avoid overflows
-        if (_cumulativeRewardPerToken == 0 || _cumulativeRewardPerToken > MAX_REWARD) {
-            return;
-        }
-
         // ledgers[_account].balance = balance * divisor
         // this divisor will be around 10^10
         // assuming that cumulativeRewardPerToken increases by at least 10^4
         // the claimableReward will increase by balance * 10^10 * 10^4 / 10^20
         // if the total supply is 1000 ETH
         // a user must own at least 10^-6 ETH or 0.000001 ETH worth of tokens to get some rewards
-        Reward memory reward = rewards[_account];
         uint256 claimableReward = uint256(reward.claimable).add(
             uint256(ledgers[_account].balance).mul(_cumulativeRewardPerToken.sub(reward.previousCumulativeRewardPerToken)).div(PRECISION)
         );
 
-        if (claimableReward > MAX_REWARD) {
+        if (claimableReward > MAX_REWARD || _cumulativeRewardPerToken > MAX_CUMULATIVE_REWARD) {
             return;
         }
 
         rewards[_account] = Reward(
-            uint128(claimableReward),
             // update previous cumulative reward for sender
-            uint128(_cumulativeRewardPerToken)
+            uint128(_cumulativeRewardPerToken),
+            uint96(claimableReward),
+            _updateLastBoughtAt ? uint32(block.timestamp % 2**32) : reward.lastBoughtAt
         );
     }
 }

@@ -35,7 +35,7 @@ contract X2ETHFactory is IX2ETHFactory {
     event GovChange(address gov);
     event FeeChange(address market, uint256 fee);
     event FeeReceiverChange(address feeReceiver);
-    event DistributorChange(address token, address distributor);
+    event DistributorChange(address token, address distributor, address rewardToken);
     event InfoChange(address token, string name, string symbol);
     event FundingChange(address market, uint256 fundingPoints, uint256 fundingInterval);
 
@@ -56,9 +56,9 @@ contract X2ETHFactory is IX2ETHFactory {
         freeMarketCreation = true;
     }
 
-    function setDistributor(address _token, address _distributor) external onlyGov {
-        IX2Token(_token).setDistributor(_distributor);
-        emit DistributorChange(_token, _distributor);
+    function setDistributor(address _token, address _distributor, address _rewardToken) external onlyGov {
+        IX2Token(_token).setDistributor(_distributor, _rewardToken);
+        emit DistributorChange(_token, _distributor, _rewardToken);
     }
 
     function setFunding(address _market, uint256 _fundingPoints, uint256 _fundingInterval) external onlyGov {
