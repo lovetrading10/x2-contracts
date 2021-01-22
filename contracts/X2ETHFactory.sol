@@ -17,13 +17,12 @@ contract X2ETHFactory is IX2ETHFactory {
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
 
     address public gov;
+    address public appOwner;
     address public distributor;
     address public override feeReceiver;
+    address public override interestReceiver;
 
     address[] public markets;
-    bool public freeMarketCreation = false;
-
-    mapping (address => uint256) public feeBasisPoints;
 
     event CreateMarket(
         address priceFeed,
@@ -33,14 +32,21 @@ contract X2ETHFactory is IX2ETHFactory {
     );
 
     event GovChange(address gov);
-    event FeeChange(address market, uint256 fee);
+    event AppOwnerChange(address appOwner);
     event FeeReceiverChange(address feeReceiver);
+    event AppFeeChange(address market, uint256 feeBasisPoints, address feeReceiver);
+    event InterestReceiverChange(address feeReceiver);
     event DistributorChange(address token, address distributor, address rewardToken);
     event InfoChange(address token, string name, string symbol);
-    event FundingChange(address market, uint256 fundingPoints, uint256 fundingInterval);
+    event FundingChange(address market, uint256 fundingDivisor);
 
     modifier onlyGov() {
-        require(msg.sender == gov, "X2Factory: forbidden");
+        require(msg.sender == gov, "X2ETHFactory: forbidden");
+        _;
+    }
+
+    modifier onlyAppOwner() {
+        require(msg.sender == appOwner, "X2ETHFactory: forbidden");
         _;
     }
 
@@ -52,18 +58,19 @@ contract X2ETHFactory is IX2ETHFactory {
         return markets.length;
     }
 
-    function enableFreeMarketCreation() external onlyGov {
-        freeMarketCreation = true;
-    }
-
     function setDistributor(address _token, address _distributor, address _rewardToken) external onlyGov {
         IX2Token(_token).setDistributor(_distributor, _rewardToken);
         emit DistributorChange(_token, _distributor, _rewardToken);
     }
 
-    function setFunding(address _market, uint256 _fundingPoints, uint256 _fundingInterval) external onlyGov {
-        IX2Market(_market).setFunding(_fundingPoints, _fundingInterval);
-        emit FundingChange(_market, _fundingPoints, _fundingInterval);
+    function setFunding(address _market, uint256 _fundingDivisor) external onlyGov {
+        IX2Market(_market).setFunding(_fundingDivisor);
+        emit FundingChange(_market, _fundingDivisor);
+    }
+
+    function setAppFee(address _market, uint256 _appFeeBasisPoints, address _appFeeReceiver) external onlyAppOwner {
+        IX2Market(_market).setAppFee(_appFeeBasisPoints, _appFeeReceiver);
+        emit AppFeeChange(_market, _appFeeBasisPoints, _appFeeReceiver);
     }
 
     function setInfo(
@@ -85,10 +92,9 @@ contract X2ETHFactory is IX2ETHFactory {
         emit GovChange(gov);
     }
 
-    function setFee(address _market, uint256 _feeBasisPoints) external onlyGov {
-        require(_feeBasisPoints <= MAX_FEE_BASIS_POINTS, "X2Factory: fee exceeds allowed limit");
-        feeBasisPoints[_market] = _feeBasisPoints;
-        emit FeeChange(_market, _feeBasisPoints);
+    function setAppOwner(address _appOwner) external onlyGov {
+        appOwner = _appOwner;
+        emit AppOwnerChange(appOwner);
     }
 
     function setFeeReceiver(address _feeReceiver) external onlyGov {
@@ -96,8 +102,9 @@ contract X2ETHFactory is IX2ETHFactory {
         emit FeeReceiverChange(feeReceiver);
     }
 
-    function getFee(address _market, uint256 _amount) external override view returns (uint256) {
-        return _amount.mul(feeBasisPoints[_market]).div(BASIS_POINTS_DIVISOR);
+    function setInterestReceiver(address _interestReceiver) external onlyGov {
+        interestReceiver = _interestReceiver;
+        emit InterestReceiverChange(interestReceiver);
     }
 
     function createMarket(
@@ -105,9 +112,7 @@ contract X2ETHFactory is IX2ETHFactory {
         uint256 _multiplierBasisPoints,
         uint256 _maxProfitBasisPoints
     ) external returns (address, address, address) {
-        if (!freeMarketCreation) {
-            require(msg.sender == gov, "X2Factory: forbidden");
-        }
+        require(msg.sender == gov || msg.sender == appOwner, "X2ETHFactory: forbidden");
 
         X2ETHMarket market = new X2ETHMarket();
         market.initialize(

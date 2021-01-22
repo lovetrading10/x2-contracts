@@ -13,7 +13,7 @@ interface IX2Token {
     function getReward(address account) external view returns (uint256);
     function costOf(address account) external view returns (uint256);
     function mint(address account, uint256 amount, uint256 divisor) external;
-    function burn(address account, uint256 amount, bool distribute) external;
+    function burn(address account, uint256 amount, bool distribute) external returns (uint256);
     function setDistributor(address _distributor, address _rewardToken) external;
     function setInfo(string memory name, string memory symbol) external;
 }

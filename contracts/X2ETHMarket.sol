@@ -20,8 +20,8 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint128 public override cachedBullDivisor;
     uint128 public override cachedBearDivisor;
 
-    uint256 public override lastPrice;
-
+    uint256 public constant FEE_BASIS_POINTS = 20; // 0.2% fee
+    uint256 public constant MAX_FEE_BASIS_POINTS = 20; // 0.2% max fee
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
     // X2Token.balance uses uint128, max uint128 has 38 digits
     // with an initial rebase divisor of 10^10
@@ -30,9 +30,11 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint128 public constant INITIAL_REBASE_DIVISOR = 10**10;
     uint256 public constant MAX_DIVISOR = uint128(-1);
 
-    uint256 public constant MAX_FUNDING_POINTS = 100; // 0.1%
-    uint256 public constant FUNDING_POINTS_DIVISOR = 100000;
-    uint256 public constant MIN_FUNDING_INTERVAL = 30 minutes;
+    uint256 public constant FUNDING_INTERVAL = 1 hours;
+    uint256 public constant MIN_FUNDING_DIVISOR = 500;
+    uint256 public constant MAX_FUNDING_DIVISOR = 1000000;
+
+    address public factory;
 
     address public override bullToken;
     address public override bearToken;
@@ -41,11 +43,13 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint256 public maxProfitBasisPoints;
     uint256 public feeReserve;
 
-    address public factory;
+    uint256 public appFeeBasisPoints;
+    address public appFeeReceiver;
+    uint256 public appFeeReserve;
 
-    uint256 public fundingPoints;
-    uint256 public fundingInterval;
-    uint256 public lastFundingTime;
+    uint256 public override lastPrice;
+    uint128 public fundingDivisor;
+    uint128 public lastFundingTime;
 
     bool public isInitialized;
 
@@ -75,14 +79,18 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
 
         lastPrice = uint176(latestPrice());
         require(lastPrice != 0, "X2ETHMarket: unsupported price feed");
+
+        _updateLastFundingTime();
     }
 
-    function setFunding(uint256 _fundingPoints, uint256 _fundingInterval) public override onlyFactory {
-        require(_fundingPoints <= MAX_FUNDING_POINTS, "X2ETHMarket: fundingPoints exceeds limit");
-        require(_fundingInterval >= MIN_FUNDING_INTERVAL, "X2ETHMarket: fundingInterval below limit");
+    function setAppFee(uint256 _appFeeBasisPoints, address _appFeeReceiver) public override onlyFactory {
+        appFeeBasisPoints = _appFeeBasisPoints;
+        appFeeReceiver = _appFeeReceiver;
+    }
 
-        fundingPoints = _fundingPoints;
-        fundingInterval = _fundingInterval;
+    function setFunding(uint256 _fundingDivisor) public override onlyFactory {
+        require(_fundingDivisor >= MIN_FUNDING_DIVISOR && _fundingDivisor <= MAX_FUNDING_DIVISOR, "X2ETHMarket: funding range exceeded");
+        fundingDivisor = uint128(_fundingDivisor);
     }
 
     function setBullToken(address _bullToken) public onlyFactory {
@@ -97,17 +105,12 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         cachedBearDivisor = INITIAL_REBASE_DIVISOR;
     }
 
-    function buy(address _token) public payable nonReentrant returns (uint256) {
-        return _buy(_token, msg.sender);
+    function buy(address _token, bool _hasAppFee) public payable nonReentrant returns (uint256) {
+        return _buy(_token, msg.sender, _hasAppFee);
     }
 
-    function sell(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
-        return _sell(_token, _amount, _receiver, true);
-    }
-
-    function sellAll(address _token, address _receiver) public nonReentrant returns (uint256) {
-        uint256 amount = IERC20(_token).balanceOf(msg.sender);
-        return _sell(_token, amount, _receiver, true);
+    function sell(address _token, uint256 _sellPoints, address _receiver, bool _hasAppFee) public nonReentrant returns (uint256) {
+        return _sell(_token, _sellPoints, _receiver, true, _hasAppFee);
     }
 
     // since an X2Token's distributor can be set by the factory's gov,
@@ -115,17 +118,12 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     // the distributor
     // this ensures that tokens can always be sold even if the distributor
     // is set to an address that intentionally fails when `distribute` is called
-    function sellWithoutDistribution(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
-        return _sell(_token, _amount, _receiver, false);
+    function sellWithoutDistribution(address _token, uint256 _sellPoints, address _receiver) public nonReentrant returns (uint256) {
+        return _sell(_token, _sellPoints, _receiver, false, false);
     }
 
-    function flip(address _token, uint256 _amount, address _receiver) public nonReentrant returns (uint256) {
-        return _flip(_token, _amount, _receiver);
-    }
-
-    function flipAll(address _token, address _receiver) public nonReentrant returns (uint256) {
-        uint256 amount = IERC20(_token).balanceOf(msg.sender);
-        return _flip(_token, amount, _receiver);
+    function flip(address _token, uint256 _flipPoints, address _receiver) public nonReentrant returns (uint256) {
+        return _flip(_token, _flipPoints, _receiver);
     }
 
     function rebase() public returns (bool) {
@@ -159,16 +157,30 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return fees;
     }
 
+    function distributeAppFees() public nonReentrant returns (uint256) {
+        require(appFeeReceiver != address(0), "X2Market: empty feeReceiver");
+
+        uint256 fees = appFeeReserve;
+        appFeeReserve = 0;
+
+        (bool success,) = appFeeReceiver.call{value: fees}("");
+        require(success, "X2ETHMarket: transfer failed");
+
+        emit DistributeFees(appFeeReceiver, fees);
+
+        return fees;
+    }
+
     function distributeInterest() public nonReentrant returns (uint256) {
-        address feeReceiver = IX2ETHFactory(factory).feeReceiver();
-        require(feeReceiver != address(0), "X2Market: empty feeReceiver");
+        address interestReceiver = IX2ETHFactory(factory).interestReceiver();
+        require(interestReceiver != address(0), "X2Market: empty interestReceiver");
 
         uint256 interest = interestReserve();
 
-        (bool success,) = feeReceiver.call{value: interest}("");
+        (bool success,) = interestReceiver.call{value: interest}("");
         require(success, "X2ETHMarket: transfer failed");
 
-        emit DistributeInterest(feeReceiver, interest);
+        emit DistributeInterest(interestReceiver, interest);
 
         return interest;
     }
@@ -182,7 +194,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         uint256 totalBears = bearRefSupply.div(cachedBearDivisor);
 
         uint256 balance = address(this).balance;
-        return balance.sub(totalBulls).sub(totalBears).sub(feeReserve);
+        return balance.sub(totalBulls).sub(totalBears).sub(feeReserve).sub(appFeeReserve);
     }
 
     function getDivisor(address _token) public override view returns (uint256) {
@@ -205,6 +217,27 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
             return uint256(lastPrice);
         }
         return uint256(answer);
+    }
+
+    function getFunding() public view returns (uint256, uint256) {
+        uint256 _lastPrice = uint256(lastPrice);
+        uint256 nextPrice = latestPrice();
+        (uint256 nextBullDivisor, uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
+
+        uint256 totalBulls = IX2Token(bullToken)._totalSupply().div(nextBullDivisor);
+        uint256 totalBears = IX2Token(bearToken)._totalSupply().div(nextBearDivisor);
+
+        if (totalBulls > totalBears && totalBears > 0) {
+            uint256 funding = totalBulls.sub(totalBears).div(uint256(fundingDivisor));
+            return (funding, 0);
+        }
+
+        if (totalBears > totalBulls && totalBulls > 0) {
+            uint256 funding = totalBears.sub(totalBulls).div(uint256(fundingDivisor));
+            return (0, funding);
+        }
+
+        return (0, 0);
     }
 
     function getDivisors(uint256 _lastPrice, uint256 _nextPrice) public override view returns (uint256, uint256) {
@@ -231,23 +264,29 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         totalBears = _nextPrice > _lastPrice ? totalBears.sub(profit) : totalBears.add(profit);
         }
 
-        if (fundingPoints > 0 && fundingInterval > 0) {
-            uint256 intervals = block.timestamp.sub(lastFundingTime).div(fundingInterval);
-            if (intervals > 0) {
-                if (totalBulls > totalBears) {
-                    totalBulls = totalBulls.sub(totalBulls.mul(intervals).mul(fundingPoints).div(FUNDING_POINTS_DIVISOR));
-                } else {
-                    totalBears = totalBears.sub(totalBears.mul(intervals).mul(fundingPoints).div(FUNDING_POINTS_DIVISOR));
-                }
+        {
+        uint256 intervals = block.timestamp.sub(uint256(lastFundingTime)).div(FUNDING_INTERVAL);
+        if (intervals > 0) {
+            if (totalBulls > totalBears && totalBears > 0) {
+                uint256 funding = totalBulls.sub(totalBears).div(uint256(fundingDivisor)).mul(intervals);
+                totalBulls = totalBulls.sub(funding);
+                totalBears = totalBears.add(funding);
             }
+            if (totalBears > totalBulls && totalBulls > 0) {
+                uint256 funding = totalBears.sub(totalBulls).div(uint256(fundingDivisor)).mul(intervals);
+                totalBears = totalBears.sub(funding);
+                totalBulls = totalBulls.add(funding);
+            }
+        }
         }
 
         return (_getNextDivisor(bullRefSupply, totalBulls, cachedBullDivisor), _getNextDivisor(bearRefSupply, totalBears, cachedBearDivisor));
     }
 
     function _updateLastFundingTime() private {
-        if (fundingPoints > 0 && fundingInterval > 0) {
-            lastFundingTime = block.timestamp;
+        uint256 intervals = block.timestamp.sub(uint256(lastFundingTime)).div(FUNDING_INTERVAL);
+        if (intervals > 0) {
+            lastFundingTime = uint128(block.timestamp);
         }
     }
 
@@ -265,14 +304,21 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     }
 
     function _collectFees(uint256 _amount) private returns (uint256) {
-        uint256 fee = IX2ETHFactory(factory).getFee(address(this), _amount);
-        if (fee == 0) { return 0; }
-
+        uint256 fee = _amount.mul(FEE_BASIS_POINTS).div(BASIS_POINTS_DIVISOR);
         feeReserve = feeReserve.add(fee);
         return fee;
     }
 
-    function _buy(address _token, address _receiver) private returns (uint256) {
+    function _collectAppFees(uint256 _amount) private returns (uint256) {
+        if (appFeeBasisPoints == 0) {
+            return 0;
+        }
+        uint256 fee = _amount.mul(appFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
+        appFeeReserve = appFeeReserve.add(fee);
+        return fee;
+    }
+
+    function _buy(address _token, address _receiver, bool _hasAppFee) private returns (uint256) {
         bool isBull = _token == bullToken;
         require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
         uint256 amount = msg.value;
@@ -281,38 +327,42 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         rebase();
 
         uint256 fee = _collectFees(amount);
-        uint256 depositAmount = amount.sub(fee);
+        uint256 appFee = _hasAppFee ? _collectAppFees(amount) : 0;
+        uint256 depositAmount = amount.sub(fee).sub(appFee);
+
         IX2Token(_token).mint(_receiver, depositAmount, isBull ? cachedBullDivisor : cachedBearDivisor);
 
         return depositAmount;
     }
 
-    function _sell(address _token, uint256 _amount, address _receiver, bool distribute) private returns (uint256) {
-        require(_amount > 0, "X2ETHMarket: insufficient amount");
+    function _sell(address _token, uint256 _sellPoints, address _receiver, bool _distribute, bool _hasAppFee) private returns (uint256) {
+        require(_sellPoints > 0, "X2ETHMarket: insufficient amount");
         require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
         rebase();
 
-        IX2Token(_token).burn(msg.sender, _amount, distribute);
+        uint256 amount = IX2Token(_token).burn(msg.sender, _sellPoints, _distribute);
 
-        uint256 fee = _collectFees(_amount);
-        uint256 withdrawAmount = _amount.sub(fee);
+        uint256 fee = _collectFees(amount);
+        uint256 appFee = _hasAppFee ? _collectAppFees(amount) : 0;
+
+        uint256 withdrawAmount = amount.sub(fee).sub(appFee);
         (bool success,) = _receiver.call{value: withdrawAmount}("");
         require(success, "X2ETHMarket: transfer failed");
 
         return withdrawAmount;
     }
 
-    function _flip(address _token, uint256 _amount, address _receiver) private returns (uint256) {
-        require(_amount > 0, "X2ETHMarket: insufficient amount");
+    function _flip(address _token, uint256 _flipPoints, address _receiver) private returns (uint256) {
+        require(_flipPoints > 0, "X2ETHMarket: insufficient amount");
 
         bool isBull = _token == bullToken;
         require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
         rebase();
 
-        IX2Token(_token).burn(msg.sender, _amount, true);
+        uint256 amount = IX2Token(_token).burn(msg.sender, _flipPoints, true);
 
-        uint256 fee = _collectFees(_amount);
-        uint256 flipAmount = _amount.sub(fee);
+        uint256 fee = _collectFees(amount);
+        uint256 flipAmount = amount.sub(fee);
 
         // if bull tokens were burnt then mint bear tokens
         // if bear tokens were burnt then mint bull tokens

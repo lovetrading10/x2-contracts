@@ -38,6 +38,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     uint256 constant MAX_BALANCE = uint128(-1);
     uint256 constant MAX_REWARD = uint96(-1);
     uint256 constant MAX_CUMULATIVE_REWARD = uint128(-1);
+    uint256 constant MAX_BURN_POINTS = 1e30;
 
     string public name = "X2";
     string public symbol = "X2";
@@ -97,8 +98,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _mint(_account, _amount, _divisor);
     }
 
-    function burn(address _account, uint256 _amount, bool _distribute) external override onlyMarket {
-        _burn(_account, _amount, _distribute);
+    function burn(address _account, uint256 _amount, bool _distribute) external override onlyMarket returns (uint256) {
+        return _burn(_account, _amount, _distribute);
     }
 
     function totalSupply() external view override returns (uint256) {
@@ -148,12 +149,27 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return uint256(rewards[_account].lastBoughtAt);
     }
 
-    function canTransfer(address _account) public view returns (bool) {
-        return lastBoughtAt(_account) < block.timestamp.sub(HOLDING_TIME);
+    function hasPendingPurchase(address _account) public view returns (bool) {
+        return lastBoughtAt(_account) > block.timestamp.sub(HOLDING_TIME);
+    }
+
+    function getPendingProfit(address _account) public view returns (uint256) {
+        if (!hasPendingPurchase(_account)) {
+            return 0;
+        }
+
+        uint256 balance = uint256(ledgers[_account].balance).div(getDivisor());
+        uint256 cost = costOf(_account);
+        return balance <= cost ? balance : balance.sub(cost);
     }
 
     function balanceOf(address _account) public view override returns (uint256) {
-        return uint256(ledgers[_account].balance).div(getDivisor());
+        uint256 balance = uint256(ledgers[_account].balance).div(getDivisor());
+        if (hasPendingPurchase(_account)) {
+            uint256 cost = costOf(_account);
+            return balance < cost ? balance : cost;
+        }
+        return balance;
     }
 
     function _balanceOf(address _account) public view override returns (uint256) {
@@ -169,7 +185,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
-        require(canTransfer(_sender), "X2Token: holding time not yet passed");
+        require(!hasPendingPurchase(_sender), "X2Token: holding time not yet passed");
         require(_sender != address(0), "X2Token: transfer from the zero address");
         require(_recipient != address(0), "X2Token: transfer to the zero address");
 
@@ -188,14 +204,30 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         emit Transfer(address(0), _account, _amount);
     }
 
-    function _burn(address _account, uint256 _amount, bool _distribute) private {
-        require(canTransfer(_account), "X2Token: holding time not yet passed");
+    function _burn(address _account, uint256 _burnPoints, bool _distribute) private returns (uint256) {
         require(_account != address(0), "X2Token: burn from the zero address");
 
         uint256 divisor = getDivisor();
-        _decreaseBalance(_account, _amount, divisor, _distribute);
 
-        emit Transfer(_account, address(0), _amount);
+        Ledger memory ledger = ledgers[_account];
+        uint256 balance = uint256(ledger.balance).div(divisor);
+        uint256 amount = balance.mul(_burnPoints).div(MAX_BURN_POINTS);
+
+        uint256 scaledAmount = amount;
+
+        if (hasPendingPurchase(_account) && balance > ledger.cost) {
+            // if there is a pending purchase and the user's balance
+            // is greater than their cost, it means they have a pending profit
+            // we scale up the amount to burn the proportional amount of
+            // pending profit
+            scaledAmount = amount.mul(balance).div(ledger.cost);
+        }
+
+        _decreaseBalance(_account, scaledAmount, divisor, _distribute);
+
+        emit Transfer(_account, address(0), amount);
+
+        return amount;
     }
 
     function _approve(address _owner, address _spender, uint256 _amount) private {
@@ -289,8 +321,12 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
             uint256(ledgers[_account].balance).mul(_cumulativeRewardPerToken.sub(reward.previousCumulativeRewardPerToken)).div(PRECISION)
         );
 
-        if (claimableReward > MAX_REWARD || _cumulativeRewardPerToken > MAX_CUMULATIVE_REWARD) {
-            return;
+        if (claimableReward > MAX_REWARD) {
+            claimableReward = MAX_REWARD;
+        }
+
+        if (_cumulativeRewardPerToken > MAX_CUMULATIVE_REWARD) {
+            _cumulativeRewardPerToken = MAX_CUMULATIVE_REWARD;
         }
 
         rewards[_account] = Reward(
