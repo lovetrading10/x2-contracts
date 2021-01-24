@@ -110,7 +110,10 @@ contract X2ETHFactory is IX2ETHFactory {
     function createMarket(
         address _priceFeed,
         uint256 _multiplierBasisPoints,
-        uint256 _maxProfitBasisPoints
+        uint256 _maxProfitBasisPoints,
+        uint256 _fundingDivisor,
+        uint256 _appFeeBasisPoints,
+        address _appFeeReceiver
     ) external returns (address, address, address) {
         require(msg.sender == gov || msg.sender == appOwner, "X2ETHFactory: forbidden");
 
@@ -119,7 +122,10 @@ contract X2ETHFactory is IX2ETHFactory {
             address(this),
             _priceFeed,
             _multiplierBasisPoints,
-            _maxProfitBasisPoints
+            _maxProfitBasisPoints,
+            _fundingDivisor,
+            _appFeeBasisPoints,
+            _appFeeReceiver
         );
 
         X2Token bullToken = new X2Token();

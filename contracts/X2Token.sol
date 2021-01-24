@@ -98,8 +98,8 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         _mint(_account, _amount, _divisor);
     }
 
-    function burn(address _account, uint256 _amount, bool _distribute) external override onlyMarket returns (uint256) {
-        return _burn(_account, _amount, _distribute);
+    function burn(address _account, uint256 _burnPoints, bool _distribute) external override onlyMarket returns (uint256) {
+        return _burn(_account, _burnPoints, _distribute);
     }
 
     function totalSupply() external view override returns (uint256) {

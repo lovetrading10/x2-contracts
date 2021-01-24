@@ -2,13 +2,17 @@ const { expandDecimals } = require("../test/shared/utilities")
 const { sendTxn, deployContract, contractAt } = require("./helpers")
 
 async function createMarket({ factory, priceFeed, multiplierBasisPoints,
-  maxProfitBasisPoints, bullName, bullSymbol, bearName, bearSymbol, label
+  maxProfitBasisPoints, fundingDivisor, appFeeBasisPoints, appFeeReceiver,
+  bullName, bullSymbol, bearName, bearSymbol, label
 }) {
 
   await sendTxn(factory.createMarket(
     priceFeed.address,
     multiplierBasisPoints,
-    maxProfitBasisPoints
+    maxProfitBasisPoints,
+    fundingDivisor,
+    appFeeBasisPoints,
+    appFeeReceiver
   ), label)
 
   const marketsLength = await factory.marketsLength()
@@ -41,14 +45,17 @@ async function createMarket({ factory, priceFeed, multiplierBasisPoints,
 
 async function main() {
   const factory = await deployContract("X2ETHFactory", [])
-  const priceFeed = { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" } // MAINNET
-  // const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" } // KOVAN
+  // const priceFeed = { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" } // MAINNET
+  const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" } // KOVAN
 
   const { market, bullToken, bearToken } = await createMarket({
     factory,
     priceFeed,
     multiplierBasisPoints: 30000, // 3x, 300%
     maxProfitBasisPoints: 9000, // 90%
+    fundingDivisor: 5000,
+    appFeeBasisPoints: 10,
+    appFeeReceiver: ethers.constants.AddressZero,
     bullName: "3X ETH/USD BULL",
     bullSymbol: "X2:BULL",
     bearName: "3X ETH/USD BEAR",
@@ -56,10 +63,10 @@ async function main() {
     label: "factory.createMarket 3X ETH/USD"
   })
 
-  const distributor = await deployContract("X2TimeDistributor", [])
-  await sendTxn(factory.setDistributor(bullToken.address, distributor.address), "factory.setDistributor(bullToken)")
-  await sendTxn(factory.setDistributor(bearToken.address, distributor.address), "factory.setDistributor(bearToken)")
-  await sendTxn(distributor.setDistribution([bullToken.address, bearToken.address], ["2000000000000000", "20000000000000000"]), "factory.setDistribution") // 0.002 and 0.02 ETH per hour
+  // const distributor = await deployContract("X2TimeDistributor", [])
+  // await sendTxn(factory.setDistributor(bullToken.address, distributor.address), "factory.setDistributor(bullToken)")
+  // await sendTxn(factory.setDistributor(bearToken.address, distributor.address), "factory.setDistributor(bearToken)")
+  // await sendTxn(distributor.setDistribution([bullToken.address, bearToken.address], ["2000000000000000", "20000000000000000"]), "factory.setDistribution") // 0.002 and 0.02 ETH per hour
 
   // await sendTxn(factory.setFee(market.address, 20), "factory.setFee")
   // await sendTxn(factory.setFeeReceiver(feeReceiver.address), "factory.setFeeReceiver")

@@ -21,7 +21,10 @@ async function loadETHFixtures(provider) {
   await factory.createMarket(
       priceFeed.address,
       30000, // multiplierBasisPoints, 300%
-      9000 // maxProfitBasisPoints, 90%
+      9000, // maxProfitBasisPoints, 90%
+      5000, // fundingDivisor
+      10, // appFeeBasisPoints, 0.1%
+      ethers.constants.AddressZero
   )
 
   const marketAddress = await factory.markets(0)

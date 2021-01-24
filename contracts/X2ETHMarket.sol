@@ -66,7 +66,10 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         address _factory,
         address _priceFeed,
         uint256 _multiplierBasisPoints,
-        uint256 _maxProfitBasisPoints
+        uint256 _maxProfitBasisPoints,
+        uint256 _fundingDivisor,
+        uint256 _appFeeBasisPoints,
+        address _appFeeReceiver
     ) public {
         require(!isInitialized, "X2ETHMarket: already initialized");
         require(_maxProfitBasisPoints <= BASIS_POINTS_DIVISOR, "X2ETHMarket: maxProfitBasisPoints limit exceeded");
@@ -76,6 +79,8 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         priceFeed = _priceFeed;
         multiplierBasisPoints = _multiplierBasisPoints;
         maxProfitBasisPoints = _maxProfitBasisPoints;
+        setFunding(_fundingDivisor);
+        setAppFee(_appFeeBasisPoints, _appFeeReceiver);
 
         lastPrice = uint176(latestPrice());
         require(lastPrice != 0, "X2ETHMarket: unsupported price feed");
@@ -84,6 +89,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     }
 
     function setAppFee(uint256 _appFeeBasisPoints, address _appFeeReceiver) public override onlyFactory {
+        require(_appFeeBasisPoints < MAX_FEE_BASIS_POINTS, "X2ETHMarket: appFeeBasisPoints limit exceeded");
         appFeeBasisPoints = _appFeeBasisPoints;
         appFeeReceiver = _appFeeReceiver;
     }
