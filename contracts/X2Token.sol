@@ -36,7 +36,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         uint32 lastBoughtAt;
     }
 
-    uint256 constant HOLDING_TIME = 15 minutes;
+    uint256 constant HOLDING_TIME = 10 minutes;
     uint256 constant PRECISION = 1e20;
     uint256 constant MAX_BALANCE = uint128(-1);
     uint256 constant MAX_REWARD = uint96(-1);
@@ -215,7 +215,6 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         Ledger memory ledger = ledgers[_account];
         uint256 balance = uint256(ledger.balance).div(divisor);
         uint256 amount = balance.mul(_burnPoints).div(MAX_BURN_POINTS);
-
         uint256 scaledAmount = amount;
 
         if (hasPendingPurchase(_account) && balance > ledger.cost) {
@@ -223,6 +222,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
             // is greater than their cost, it means they have a pending profit
             // we scale up the amount to burn the proportional amount of
             // pending profit
+            amount = uint256(ledger.cost).mul(_burnPoints).div(MAX_BURN_POINTS);
             scaledAmount = amount.mul(balance).div(ledger.cost);
         }
 
