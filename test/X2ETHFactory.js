@@ -1,6 +1,6 @@
 const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
-const { loadETHFixtures, contractAt } = require("./shared/fixtures")
+const { loadETHFixtures, contractAt, deployContract } = require("./shared/fixtures")
 const { maxUint256, expandDecimals, reportGasUsed, increaseTime, mineBlock } = require("./shared/utilities")
 const { toChainlinkPrice } = require("./shared/chainlink")
 
@@ -8,13 +8,14 @@ use(solidity)
 
 describe("X2ETHFactory", function () {
   const provider = waffle.provider
-  const [wallet, user0, user1] = provider.getWallets()
+  const [wallet, user0, user1, user2] = provider.getWallets()
   let factory
   let router
   let market
   let bullToken
   let bearToken
   let priceFeed
+  let feeSplitToken
 
   beforeEach(async () => {
     const fixtures = await loadETHFixtures(provider)
@@ -23,136 +24,151 @@ describe("X2ETHFactory", function () {
     bullToken = fixtures.bullToken
     bearToken = fixtures.bearToken
     priceFeed = fixtures.priceFeed
+    feeSplitToken = await deployContract("X2FeeSplit", ["X2 Fee Split", "X2FS", expandDecimals(50000, 18)])
   })
 
-  it("inits", async () => {
-    expect(await factory.gov()).eq(wallet.address)
-  })
+  // it("inits", async () => {
+  //   expect(await factory.gov()).eq(wallet.address)
+  // })
+  //
+  // it("marketsLength", async () => {
+  //   expect(await factory.marketsLength()).eq(1)
+  // })
 
-  it("marketsLength", async () => {
-    expect(await factory.marketsLength()).eq(1)
-  })
+  // it("setGov", async () => {
+  //   expect(await factory.gov()).eq(wallet.address)
+  //   await expect(factory.connect(user0).setGov(user0.address))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setGov(user0.address)
+  //   expect(await factory.gov()).eq(user0.address)
+  //
+  //   await factory.connect(user0).setGov(user1.address)
+  //   expect(await factory.gov()).eq(user1.address)
+  // })
 
-  it("enableFreeMarketCreation", async () => {
-    expect(await factory.freeMarketCreation()).eq(false)
-    await expect(factory.connect(user0).createMarket(
-      priceFeed.address,
-      50000, // multiplierBasisPoints, 500%
-      8000 // maxProfitBasisPoints, 80%
-    )).to.be.revertedWith("X2Factory: forbidden")
+  // it("setDistributor", async () => {
+  //   expect(await factory.gov()).eq(wallet.address)
+  //   await expect(factory.connect(user0).setDistributor(bullToken.address, user1.address, feeSplitToken.address))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setGov(user0.address)
+  //   expect(await factory.gov()).eq(user0.address)
+  //
+  //   expect(await bullToken.distributor()).eq(ethers.constants.AddressZero)
+  //   await factory.connect(user0).setDistributor(bullToken.address, user1.address, feeSplitToken.address)
+  //   expect(await bullToken.distributor()).eq(user1.address)
+  // })
 
-    await expect(factory.connect(user0).enableFreeMarketCreation())
-      .to.be.revertedWith("X2Factory: forbidden")
+  // it("setFunding", async () => {
+  //   expect(await factory.gov()).eq(wallet.address)
+  //   await expect(factory.connect(user0).setFunding(market.address, 1000))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setGov(user0.address)
+  //   expect(await factory.gov()).eq(user0.address)
+  //
+  //   expect(await market.fundingDivisor()).eq(5000)
+  //   await factory.connect(user0).setFunding(market.address, 1000)
+  //   expect(await market.fundingDivisor()).eq(1000)
+  // })
 
-    await factory.enableFreeMarketCreation()
-    expect(await factory.freeMarketCreation()).eq(true)
-    expect(await factory.marketsLength()).eq(1)
+  // it("setAppOwner", async () => {
+  //   expect(await factory.gov()).eq(wallet.address)
+  //   await expect(factory.connect(user0).setAppOwner(user1.address))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setGov(user0.address)
+  //   expect(await factory.gov()).eq(user0.address)
+  //
+  //   expect(await factory.appOwner()).eq(ethers.constants.AddressZero)
+  //   await factory.connect(user0).setAppOwner(user1.address)
+  //   expect(await factory.appOwner()).eq(user1.address)
+  // })
 
-    await factory.connect(user0).createMarket(
-      priceFeed.address,
-      50000, // multiplierBasisPoints, 500%
-      8000 // maxProfitBasisPoints, 90%
-    )
+  // it("setAppFee", async () => {
+  //   expect(await factory.gov()).eq(wallet.address)
+  //   await expect(factory.connect(wallet).setAppFee(market.address, 10, user2.address))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //   await expect(factory.connect(user1).setAppFee(market.address, 10, user2.address))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setAppOwner(user1.address)
+  //   expect(await factory.appOwner()).eq(user1.address)
+  //
+  //   expect(await market.appFeeBasisPoints()).eq(10)
+  //   expect(await market.appFeeReceiver()).eq(ethers.constants.AddressZero)
+  //   await factory.connect(user1).setAppFee(market.address, 20, user2.address)
+  //   expect(await market.appFeeBasisPoints()).eq(20)
+  //   expect(await market.appFeeReceiver()).eq(user2.address)
+  // })
+  //
+  // it("setFeeReceiver", async () => {
+  //   expect(await factory.feeReceiver()).eq(ethers.constants.AddressZero)
+  //   await expect(factory.connect(user0).setFeeReceiver(user1.address))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setGov(user0.address)
+  //   expect(await factory.gov()).eq(user0.address)
+  //
+  //   expect(await factory.feeReceiver()).eq(ethers.constants.AddressZero)
+  //   await factory.connect(user0).setFeeReceiver(user1.address)
+  //   expect(await factory.feeReceiver()).eq(user1.address)
+  // })
+  //
+  // it("setInterestReceiver", async () => {
+  //   expect(await factory.interestReceiver()).eq(ethers.constants.AddressZero)
+  //   await expect(factory.connect(user0).setInterestReceiver(user2.address))
+  //     .to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setGov(user0.address)
+  //   expect(await factory.gov()).eq(user0.address)
+  //
+  //   expect(await factory.interestReceiver()).eq(ethers.constants.AddressZero)
+  //   await factory.connect(user0).setInterestReceiver(user2.address)
+  //   expect(await factory.interestReceiver()).eq(user2.address)
+  // })
 
-    expect(await factory.marketsLength()).eq(2)
-  })
-
-  it("setDistributor", async () => {
-    expect(await factory.gov()).eq(wallet.address)
-    await expect(factory.connect(user0).setDistributor(bullToken.address, user1.address))
-      .to.be.revertedWith("X2Factory: forbidden")
-
-    await factory.setGov(user0.address)
-    expect(await factory.gov()).eq(user0.address)
-
-    expect(await bullToken.distributor()).eq(ethers.constants.AddressZero)
-    await factory.connect(user0).setDistributor(bullToken.address, user1.address)
-    expect(await bullToken.distributor()).eq(user1.address)
-  })
-
-  it("setInfo", async () => {
-    expect(await factory.gov()).eq(wallet.address)
-    await expect(factory.connect(user0).setInfo(
-      bullToken.address,
-      "X2:BULL Token",
-      "X2:BULL",
-      bearToken.address,
-      "X2:BEAR Token",
-      "X2:BEAR"
-    )).to.be.revertedWith("X2Factory: forbidden")
-
-    await factory.setGov(user0.address)
-    expect(await factory.gov()).eq(user0.address)
-
-    expect(await bullToken.name()).eq("X2")
-    expect(await bullToken.symbol()).eq("X2")
-    expect(await bearToken.name()).eq("X2")
-    expect(await bearToken.symbol()).eq("X2")
-    await factory.connect(user0).setInfo(
-      bullToken.address,
-      "X2:BULL Token",
-      "X2:BULL",
-      bearToken.address,
-      "X2:BEAR Token",
-      "X2:BEAR"
-    )
-    expect(await bullToken.name()).eq("X2:BULL Token")
-    expect(await bullToken.symbol()).eq("X2:BULL")
-    expect(await bearToken.name()).eq("X2:BEAR Token")
-    expect(await bearToken.symbol()).eq("X2:BEAR")
-  })
-
-  it("setGov", async () => {
-    expect(await factory.gov()).eq(wallet.address)
-    await expect(factory.connect(user0).setGov(user0.address))
-      .to.be.revertedWith("X2Factory: forbidden")
-
-    await factory.setGov(user0.address)
-    expect(await factory.gov()).eq(user0.address)
-
-    await factory.connect(user0).setGov(user1.address)
-    expect(await factory.gov()).eq(user1.address)
-  })
-
-  it("setFee", async () => {
-    await expect(factory.setFee(market.address, 41))
-      .to.be.revertedWith("X2Factory: fee exceeds allowed limit")
-
-    await expect(factory.connect(user0).setFee(market.address, 40))
-      .to.be.revertedWith("X2Factory: forbidden")
-
-    expect(await factory.feeBasisPoints(market.address)).eq(0)
-
-    await factory.setFee(market.address, 40)
-    expect(await factory.feeBasisPoints(market.address)).eq(40)
-  })
-
-  it("setFeeReceiver", async () => {
-    expect(await factory.feeReceiver()).eq(ethers.constants.AddressZero)
-    await expect(factory.connect(user0).setFeeReceiver(user1.address))
-      .to.be.revertedWith("X2Factory: forbidden")
-
-    await factory.setFeeReceiver(user1.address)
-    expect(await factory.feeReceiver()).eq(user1.address)
-  })
-
-  it("getFee", async () => {
-    expect(await factory.getFee(market.address, 20000)).eq(0)
-    await factory.setFee(market.address, 30)
-    expect(await factory.getFee(market.address, 20000)).eq(60)
-  })
+  // it("setInfo", async () => {
+  //   expect(await factory.gov()).eq(wallet.address)
+  //   await expect(factory.connect(user0).setInfo(
+  //     bullToken.address,
+  //     "X2:BULL Token",
+  //     "X2:BULL",
+  //     bearToken.address,
+  //     "X2:BEAR Token",
+  //     "X2:BEAR"
+  //   )).to.be.revertedWith("X2ETHFactory: forbidden")
+  //
+  //   await factory.setGov(user0.address)
+  //   expect(await factory.gov()).eq(user0.address)
+  //
+  //   expect(await bullToken.name()).eq("X2")
+  //   expect(await bullToken.symbol()).eq("X2")
+  //   expect(await bearToken.name()).eq("X2")
+  //   expect(await bearToken.symbol()).eq("X2")
+  //   await factory.connect(user0).setInfo(
+  //     bullToken.address,
+  //     "X2:BULL Token",
+  //     "X2:BULL",
+  //     bearToken.address,
+  //     "X2:BEAR Token",
+  //     "X2:BEAR"
+  //   )
+  //   expect(await bullToken.name()).eq("X2:BULL Token")
+  //   expect(await bullToken.symbol()).eq("X2:BULL")
+  //   expect(await bearToken.name()).eq("X2:BEAR Token")
+  //   expect(await bearToken.symbol()).eq("X2:BEAR")
+  // })
 
   it("createMarket", async () => {
-    await expect(factory.createMarket(
-      priceFeed.address,
-      50000,
-      10001
-    )).to.be.reverted
-
     const tx = await factory.createMarket(
       priceFeed.address,
       50000, // multiplierBasisPoints, 500%
-      10000 // maxProfitBasisPoints, 100%
+      10000, // maxProfitBasisPoints, 100%
+      1000, // fundingDivisor
+      5, // appFeeBasisPoints
+      user2.address
     )
     await reportGasUsed(provider, tx, "createMarket gas used")
 
@@ -167,6 +183,8 @@ describe("X2ETHFactory", function () {
     expect(await market.priceFeed()).eq(priceFeed.address)
     expect(await market.multiplierBasisPoints()).eq(50000)
     expect(await market.maxProfitBasisPoints()).eq(10000)
+    expect(await market.fundingDivisor()).eq(1000)
+    expect(await market.appFeeBasisPoints()).eq(5)
     expect(await market.lastPrice()).eq(toChainlinkPrice(1000))
 
     expect(await bullToken.factory()).eq(factory.address)
@@ -178,7 +196,9 @@ describe("X2ETHFactory", function () {
       factory.address,
       priceFeed.address,
       50000, // multiplierBasisPoints, 500%
-      8000 // maxProfitBasisPoints, 90%
+      8000, // maxProfitBasisPoints, 80%
+      2000, // fundingDivisor
+      10 // appFeeBasisPoints
     )).to.be.reverted
 
     await expect(bullToken.initialize(factory.address, market.address))

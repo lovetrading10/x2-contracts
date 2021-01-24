@@ -26,7 +26,10 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     // each 1 wei of rewards will increase cumulativeRewardPerToken by
     // 1*10^10 (PRECISION 10^20 / divisor 10^10)
     // assuming a supply of only 1 wei of X2Tokens
-    // so total rewards of up to 10^28 wei or 1 billion ETH is supported
+    // if the reward token has 18 decimals, total rewards of up to
+    // 1 billion reward tokens is supported
+    // max uint96 has 28 digits, so max claimable rewards also supports
+    // 1 billion reward tokens
     struct Reward {
         uint128 previousCumulativeRewardPerToken;
         uint96 claimable;
@@ -160,16 +163,16 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
         uint256 balance = uint256(ledgers[_account].balance).div(getDivisor());
         uint256 cost = costOf(_account);
-        return balance <= cost ? balance : balance.sub(cost);
+        return balance <= cost ? 0 : balance.sub(cost);
     }
 
     function balanceOf(address _account) public view override returns (uint256) {
         uint256 balance = uint256(ledgers[_account].balance).div(getDivisor());
-        if (hasPendingPurchase(_account)) {
-            uint256 cost = costOf(_account);
-            return balance < cost ? balance : cost;
+        if (!hasPendingPurchase(_account)) {
+            return balance;
         }
-        return balance;
+        uint256 cost = costOf(_account);
+        return balance < cost ? balance : cost;
     }
 
     function _balanceOf(address _account) public view override returns (uint256) {
@@ -302,10 +305,10 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
             // the divisor will be around 10^10
             // if 1000 ETH worth is minted, then cachedTotalSupply = 1000 * 10^18 * 10^10 = 10^31
             // cumulativeRewardPerToken will increase by blockReward * 10^20 / (10^31)
-            // if the blockReward is 0.001 ETH, 10^-3 ETH or 10^-3 * 10^18 WEI
+            // if the blockReward is 0.001 REWARD_TOKENS
             // then cumulativeRewardPerToken will increase by 10^-3 * 10^18 * 10^20 / (10^31)
             // which is 10^35 / 10^31 or 10^4
-            // if rewards are distributed every hour then at least 0.168 ETH should be distributed per week
+            // if rewards are distributed every hour then at least 0.168 REWARD_TOKENS should be distributed per week
             // so that there will not be precision issues for distribution
             _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.mul(PRECISION).div(_cachedTotalSupply));
             cumulativeRewardPerToken = _cumulativeRewardPerToken;

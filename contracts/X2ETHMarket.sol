@@ -21,7 +21,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint128 public override cachedBearDivisor;
 
     uint256 public constant FEE_BASIS_POINTS = 20; // 0.2% fee
-    uint256 public constant MAX_FEE_BASIS_POINTS = 20; // 0.2% max fee
+    uint256 public constant MAX_APP_FEE_BASIS_POINTS = 20; // 0.2% max app fee
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
     // X2Token.balance uses uint128, max uint128 has 38 digits
     // with an initial rebase divisor of 10^10
@@ -47,9 +47,10 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     address public appFeeReceiver;
     uint256 public appFeeReserve;
 
+    uint256 public fundingDivisor;
+    uint256 public lastFundingTime;
+
     uint256 public override lastPrice;
-    uint128 public fundingDivisor;
-    uint128 public lastFundingTime;
 
     bool public isInitialized;
 
@@ -89,14 +90,14 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     }
 
     function setAppFee(uint256 _appFeeBasisPoints, address _appFeeReceiver) public override onlyFactory {
-        require(_appFeeBasisPoints < MAX_FEE_BASIS_POINTS, "X2ETHMarket: appFeeBasisPoints limit exceeded");
+        require(_appFeeBasisPoints <= MAX_APP_FEE_BASIS_POINTS, "X2ETHMarket: appFeeBasisPoints limit exceeded");
         appFeeBasisPoints = _appFeeBasisPoints;
         appFeeReceiver = _appFeeReceiver;
     }
 
     function setFunding(uint256 _fundingDivisor) public override onlyFactory {
         require(_fundingDivisor >= MIN_FUNDING_DIVISOR && _fundingDivisor <= MAX_FUNDING_DIVISOR, "X2ETHMarket: funding range exceeded");
-        fundingDivisor = uint128(_fundingDivisor);
+        fundingDivisor = _fundingDivisor;
     }
 
     function setBullToken(address _bullToken) public onlyFactory {
@@ -234,12 +235,12 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         uint256 totalBears = IX2Token(bearToken)._totalSupply().div(nextBearDivisor);
 
         if (totalBulls > totalBears && totalBears > 0) {
-            uint256 funding = totalBulls.sub(totalBears).div(uint256(fundingDivisor));
+            uint256 funding = totalBulls.sub(totalBears).div(fundingDivisor);
             return (funding, 0);
         }
 
         if (totalBears > totalBulls && totalBulls > 0) {
-            uint256 funding = totalBears.sub(totalBulls).div(uint256(fundingDivisor));
+            uint256 funding = totalBears.sub(totalBulls).div(fundingDivisor);
             return (0, funding);
         }
 
@@ -271,15 +272,15 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         }
 
         {
-        uint256 intervals = block.timestamp.sub(uint256(lastFundingTime)).div(FUNDING_INTERVAL);
+        uint256 intervals = block.timestamp.sub(lastFundingTime).div(FUNDING_INTERVAL);
         if (intervals > 0) {
             if (totalBulls > totalBears && totalBears > 0) {
-                uint256 funding = totalBulls.sub(totalBears).div(uint256(fundingDivisor)).mul(intervals);
+                uint256 funding = totalBulls.sub(totalBears).div(fundingDivisor).mul(intervals);
                 totalBulls = totalBulls.sub(funding);
                 totalBears = totalBears.add(funding);
             }
             if (totalBears > totalBulls && totalBulls > 0) {
-                uint256 funding = totalBears.sub(totalBulls).div(uint256(fundingDivisor)).mul(intervals);
+                uint256 funding = totalBears.sub(totalBulls).div(fundingDivisor).mul(intervals);
                 totalBears = totalBears.sub(funding);
                 totalBulls = totalBulls.add(funding);
             }
@@ -290,9 +291,9 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     }
 
     function _updateLastFundingTime() private {
-        uint256 intervals = block.timestamp.sub(uint256(lastFundingTime)).div(FUNDING_INTERVAL);
+        uint256 intervals = block.timestamp.sub(lastFundingTime).div(FUNDING_INTERVAL);
         if (intervals > 0) {
-            lastFundingTime = uint128(block.timestamp);
+            lastFundingTime = block.timestamp;
         }
     }
 

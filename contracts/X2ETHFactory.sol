@@ -13,12 +13,8 @@ import "./X2Token.sol";
 contract X2ETHFactory is IX2ETHFactory {
     using SafeMath for uint256;
 
-    uint256 public constant MAX_FEE_BASIS_POINTS = 40; // max 0.4% fee
-    uint256 public constant BASIS_POINTS_DIVISOR = 10000;
-
     address public gov;
     address public appOwner;
-    address public distributor;
     address public override feeReceiver;
     address public override interestReceiver;
 
@@ -28,17 +24,20 @@ contract X2ETHFactory is IX2ETHFactory {
         address priceFeed,
         uint256 multiplierBasisPoints,
         uint256 maxProfitBasisPoints,
+        uint256 fundingDivisor,
+        uint256 appFeeBasisPoints,
+        address appFeeReceiver,
         uint256 index
     );
 
     event GovChange(address gov);
-    event AppOwnerChange(address appOwner);
     event FeeReceiverChange(address feeReceiver);
-    event AppFeeChange(address market, uint256 feeBasisPoints, address feeReceiver);
     event InterestReceiverChange(address feeReceiver);
     event DistributorChange(address token, address distributor, address rewardToken);
     event InfoChange(address token, string name, string symbol);
     event FundingChange(address market, uint256 fundingDivisor);
+    event AppOwnerChange(address appOwner);
+    event AppFeeChange(address market, uint256 feeBasisPoints, address feeReceiver);
 
     modifier onlyGov() {
         require(msg.sender == gov, "X2ETHFactory: forbidden");
@@ -58,6 +57,11 @@ contract X2ETHFactory is IX2ETHFactory {
         return markets.length;
     }
 
+    function setGov(address _gov) external onlyGov {
+        gov = _gov;
+        emit GovChange(gov);
+    }
+
     function setDistributor(address _token, address _distributor, address _rewardToken) external onlyGov {
         IX2Token(_token).setDistributor(_distributor, _rewardToken);
         emit DistributorChange(_token, _distributor, _rewardToken);
@@ -68,9 +72,24 @@ contract X2ETHFactory is IX2ETHFactory {
         emit FundingChange(_market, _fundingDivisor);
     }
 
+    function setAppOwner(address _appOwner) external onlyGov {
+        appOwner = _appOwner;
+        emit AppOwnerChange(appOwner);
+    }
+
     function setAppFee(address _market, uint256 _appFeeBasisPoints, address _appFeeReceiver) external onlyAppOwner {
         IX2Market(_market).setAppFee(_appFeeBasisPoints, _appFeeReceiver);
         emit AppFeeChange(_market, _appFeeBasisPoints, _appFeeReceiver);
+    }
+
+    function setFeeReceiver(address _feeReceiver) external onlyGov {
+        feeReceiver = _feeReceiver;
+        emit FeeReceiverChange(feeReceiver);
+    }
+
+    function setInterestReceiver(address _interestReceiver) external onlyGov {
+        interestReceiver = _interestReceiver;
+        emit InterestReceiverChange(interestReceiver);
     }
 
     function setInfo(
@@ -85,26 +104,6 @@ contract X2ETHFactory is IX2ETHFactory {
         IX2Token(_bearToken).setInfo(_bearName, _bearSymbol);
         emit InfoChange(_bullToken, _bullName, _bullSymbol);
         emit InfoChange(_bearToken, _bearName, _bearSymbol);
-    }
-
-    function setGov(address _gov) external onlyGov {
-        gov = _gov;
-        emit GovChange(gov);
-    }
-
-    function setAppOwner(address _appOwner) external onlyGov {
-        appOwner = _appOwner;
-        emit AppOwnerChange(appOwner);
-    }
-
-    function setFeeReceiver(address _feeReceiver) external onlyGov {
-        feeReceiver = _feeReceiver;
-        emit FeeReceiverChange(feeReceiver);
-    }
-
-    function setInterestReceiver(address _interestReceiver) external onlyGov {
-        interestReceiver = _interestReceiver;
-        emit InterestReceiverChange(interestReceiver);
     }
 
     function createMarket(
@@ -143,6 +142,9 @@ contract X2ETHFactory is IX2ETHFactory {
             _priceFeed,
             _multiplierBasisPoints,
             _maxProfitBasisPoints,
+            _fundingDivisor,
+            _appFeeBasisPoints,
+            _appFeeReceiver,
             markets.length - 1
         );
 
