@@ -90,7 +90,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     }
 
     function setAppFee(uint256 _appFeeBasisPoints, address _appFeeReceiver) public override onlyFactory {
-        require(_appFeeBasisPoints <= MAX_APP_FEE_BASIS_POINTS, "X2ETHMarket: appFeeBasisPoints limit exceeded");
+        require(_appFeeBasisPoints <= MAX_APP_FEE_BASIS_POINTS, "X2ETHMarket: fee limit exceeded");
         appFeeBasisPoints = _appFeeBasisPoints;
         appFeeReceiver = _appFeeReceiver;
     }
@@ -129,21 +129,24 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return _sell(_token, _sellPoints, _receiver, false, false);
     }
 
-    function flip(address _token, uint256 _flipPoints, address _receiver) public nonReentrant returns (uint256) {
-        return _flip(_token, _flipPoints, _receiver);
+    function flip(address _token, uint256 _flipPoints) public nonReentrant returns (uint256) {
+        return _flip(_token, _flipPoints, msg.sender);
     }
 
     function rebase() public returns (bool) {
         uint256 _lastPrice = uint256(lastPrice);
         uint256 nextPrice = latestPrice();
-        if (_lastPrice == nextPrice) { return false; }
+        uint256 intervals = block.timestamp.sub(lastFundingTime).div(FUNDING_INTERVAL);
+        if (_lastPrice == nextPrice && intervals == 0) { return false; }
 
         (uint256 nextBullDivisor, uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);
 
         lastPrice = nextPrice;
         cachedBullDivisor = uint128(nextBullDivisor);
         cachedBearDivisor = uint128(nextBearDivisor);
-        _updateLastFundingTime();
+        if (intervals > 0) {
+            _updateLastFundingTime();
+        }
 
         emit Rebase(nextPrice, uint128(nextBullDivisor), uint128(nextBearDivisor));
         return true;
@@ -208,8 +211,9 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         bool isBull = _token == bullToken;
         uint256 _lastPrice = uint256(lastPrice);
         uint256 nextPrice = latestPrice();
+        uint256 intervals = block.timestamp.sub(lastFundingTime).div(FUNDING_INTERVAL);
 
-        if (_lastPrice == nextPrice) {
+        if (_lastPrice == nextPrice && intervals == 0) {
             return isBull ? cachedBullDivisor : cachedBearDivisor;
         }
 
@@ -291,10 +295,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     }
 
     function _updateLastFundingTime() private {
-        uint256 intervals = block.timestamp.sub(lastFundingTime).div(FUNDING_INTERVAL);
-        if (intervals > 0) {
-            lastFundingTime = block.timestamp;
-        }
+        lastFundingTime = block.timestamp;
     }
 
     function _getNextDivisor(uint256 _refSupply, uint256 _nextSupply, uint256 _fallbackDivisor) private pure returns (uint256) {
@@ -362,8 +363,8 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     function _flip(address _token, uint256 _flipPoints, address _receiver) private returns (uint256) {
         require(_flipPoints > 0, "X2ETHMarket: insufficient amount");
 
-        bool isBull = _token == bullToken;
-        require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
+        bool sellBull = _token == bullToken;
+        require(sellBull || _token == bearToken, "X2ETHMarket: unsupported token");
         rebase();
 
         uint256 amount = IX2Token(_token).burn(msg.sender, _flipPoints, true);
@@ -373,10 +374,10 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
 
         // if bull tokens were burnt then mint bear tokens
         // if bear tokens were burnt then mint bull tokens
-        IX2Token(isBull ? bearToken : bullToken).mint(
+        IX2Token(sellBull ? bearToken : bullToken).mint(
             _receiver,
             flipAmount,
-            isBull ? cachedBullDivisor : cachedBearDivisor
+            sellBull ? cachedBearDivisor : cachedBullDivisor
         );
 
         return flipAmount;

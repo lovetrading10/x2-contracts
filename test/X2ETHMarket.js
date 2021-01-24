@@ -36,7 +36,7 @@ describe("X2ETHMarket", function () {
     floor = xvixFixtures.floor
 
     rewardToken = await deployContract("X2FeeSplit", ["3X ETH/USD X2 FS", "X2FS", expandDecimals(50000, 18)])
-    distributor = await deployContract("X2TokenDistributor", [])
+    distributor = await deployContract("X2RewardDistributor", [])
 
     await factory.setDistributor(bullToken.address, distributor.address, rewardToken.address)
     await factory.setDistributor(bearToken.address, distributor.address, rewardToken.address)
@@ -172,7 +172,7 @@ describe("X2ETHMarket", function () {
     expect(await bearToken.totalSupply()).eq("10796545453367649586")
   })
 
-  it("sell within holding time", async () => {
+  it("sell", async () => {
     const receiver0 = newWallet()
     const receiver1 = newWallet()
 
@@ -191,6 +191,14 @@ describe("X2ETHMarket", function () {
     expect(await bearToken.balanceOf(user1.address)).eq("6985999999860280000")
     expect(await bearToken.totalSupply()).eq("6985999999860280000")
 
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(true)
+    expect(await bullToken.hasPendingPurchase(user1.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user0.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(true)
+
+    expect(await bullToken.getPendingProfit(user0.address)).eq("2993999998832340000")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
+
     expect(await market.interestReserve()).eq("0")
     await market.connect(user0).sell(bullToken.address, expandDecimals(5, 29), receiver0.address, false)
 
@@ -201,8 +209,24 @@ describe("X2ETHMarket", function () {
     expect(await bearToken.balanceOf(user1.address)).eq("6985999999860280000")
     expect(await bearToken.totalSupply()).eq("6985999999860280000")
 
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(true)
+    expect(await bullToken.hasPendingPurchase(user1.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user0.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(true)
+
+    expect(await bullToken.getPendingProfit(user0.address)).eq("1496999999416170000")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
+
     await increaseTime(provider, 11 * 60)
     await mineBlock(provider)
+
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(false)
+    expect(await bullToken.hasPendingPurchase(user1.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user0.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(false)
+
+    expect(await bullToken.getPendingProfit(user0.address)).eq("0")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
 
     expect(await bullToken.balanceOf(user0.address)).eq("6486999999416170000")
     await market.connect(user0).sell(bullToken.address, expandDecimals(1, 30), receiver0.address, false)
@@ -215,7 +239,7 @@ describe("X2ETHMarket", function () {
     expect(await bearToken.totalSupply()).eq("6985999999860280000")
   })
 
-  it("sell all within holding time", async () => {
+  it("sell all", async () => {
     const receiver0 = newWallet()
     const receiver1 = newWallet()
 
@@ -227,7 +251,17 @@ describe("X2ETHMarket", function () {
     expect(await bearToken.balanceOf(user1.address)).eq("9980000000000000000")
     expect(await bearToken.totalSupply()).eq("9980000000000000000")
 
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(true)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(true)
+    expect(await bullToken.getPendingProfit(user0.address)).eq("0")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
+
     await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(true)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(true)
+    expect(await bullToken.getPendingProfit(user0.address)).eq("2993999998832340000")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
 
     expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
     expect(await bullToken.totalSupply()).eq("12973999998832340000")
@@ -236,6 +270,11 @@ describe("X2ETHMarket", function () {
 
     expect(await market.interestReserve()).eq("0")
     await market.connect(user0).sell(bullToken.address, expandDecimals(1, 30), receiver0.address, false)
+
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(true)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(true)
+    expect(await bullToken.getPendingProfit(user0.address)).eq("0")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
 
     expect(await bullToken.balanceOf(user0.address)).eq("0")
     expect(await bullToken.totalSupply()).eq("0")
@@ -246,6 +285,11 @@ describe("X2ETHMarket", function () {
 
     await increaseTime(provider, 11 * 60)
     await mineBlock(provider)
+
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(false)
+    expect(await bullToken.getPendingProfit(user0.address)).eq("0")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
 
     expect(await bullToken.balanceOf(user0.address)).eq("0")
     expect(await bullToken.totalSupply()).eq("0")
@@ -431,5 +475,160 @@ describe("X2ETHMarket", function () {
     expect(await market.interestReserve()).eq("0")
     expect(await market.appFeeReserve()).eq("0")
     expect(await market.feeReserve()).eq("0")
+  })
+
+  it("flip", async () => {
+    const receiver0 = newWallet()
+    const receiver1 = newWallet()
+    const receiver2 = newWallet()
+
+    await market.connect(user0).buy(bullToken.address, false, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
+    expect(await bullToken.totalSupply()).eq("9980000000000000000")
+
+    await market.connect(user1).buy(bearToken.address, false, { value: expandDecimals(10, 18) })
+    expect(await bearToken.balanceOf(user1.address)).eq("9980000000000000000")
+    expect(await bearToken.totalSupply()).eq("9980000000000000000")
+
+    await priceFeed.setLatestAnswer(toChainlinkPrice(1100))
+
+    expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
+    expect(await bearToken.balanceOf(user0.address)).eq("0")
+    expect(await bullToken.totalSupply()).eq("12973999998832340000")
+    expect(await bearToken.balanceOf(user1.address)).eq("6985999999860280000")
+    expect(await bearToken.totalSupply()).eq("6985999999860280000")
+
+    expect(await market.feeReserve()).eq("40000000000000000")
+    await market.connect(user0).flip(bullToken.address, expandDecimals(5, 29))
+    expect(await market.feeReserve()).eq("49980000000000000")
+
+    expect(await bullToken.balanceOf(user0.address)).eq("4990000000000000000")
+    expect(await bearToken.balanceOf(user0.address)).eq("4980020000000000000")
+    expect(await bullToken.totalSupply()).eq("6486999999416170000")
+    expect(await bearToken.balanceOf(user1.address)).eq("6985999999860280000")
+    expect(await bearToken.totalSupply()).eq("11966019999860280000")
+
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(true)
+    expect(await bullToken.hasPendingPurchase(user1.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user0.address)).eq(true)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(true)
+
+    expect(await bullToken.getPendingProfit(user0.address)).eq("1496999999416170000")
+    expect(await bearToken.getPendingProfit(user0.address)).eq("0")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
+
+    await increaseTime(provider, 11 * 60)
+    await mineBlock(provider)
+
+    expect(await bullToken.hasPendingPurchase(user0.address)).eq(false)
+    expect(await bullToken.hasPendingPurchase(user1.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user0.address)).eq(false)
+    expect(await bearToken.hasPendingPurchase(user1.address)).eq(false)
+
+    expect(await bullToken.getPendingProfit(user0.address)).eq("0")
+    expect(await bearToken.getPendingProfit(user0.address)).eq("0")
+    expect(await bearToken.getPendingProfit(user1.address)).eq("0")
+
+    expect(await bullToken.balanceOf(user0.address)).eq("6486999999416170000")
+    expect(await bearToken.balanceOf(user0.address)).eq("4980020000000000000")
+    expect(await bullToken.totalSupply()).eq("6486999999416170000")
+    expect(await bearToken.balanceOf(user1.address)).eq("6985999999860280000")
+    expect(await bearToken.totalSupply()).eq("11966019999860280000")
+
+    expect(await provider.getBalance(receiver0.address)).eq(0)
+    expect(await provider.getBalance(receiver1.address)).eq(0)
+    expect(await provider.getBalance(receiver2.address)).eq(0)
+
+    await market.connect(user0).sell(bullToken.address, expandDecimals(1, 30), receiver0.address, false)
+    await market.connect(user0).sell(bearToken.address, expandDecimals(1, 30), receiver1.address, false)
+    await market.connect(user1).sell(bearToken.address, expandDecimals(1, 30), receiver2.address, false)
+
+    expect(await provider.getBalance(receiver0.address)).eq("6474025999417337660")
+    expect(await provider.getBalance(receiver1.address)).eq("4970059960000000000")
+    expect(await provider.getBalance(receiver2.address)).eq("6972027999860559440")
+  })
+
+  it("bulls pay bears", async () => {
+    const receiver0 = newWallet()
+
+    await market.connect(user0).buy(bullToken.address, false, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
+    expect(await bullToken.totalSupply()).eq("9980000000000000000")
+
+    await market.connect(user1).buy(bearToken.address, false, { value: expandDecimals(10, 18) })
+    expect(await bearToken.balanceOf(user1.address)).eq("9980000000000000000")
+    expect(await bearToken.totalSupply()).eq("9980000000000000000")
+
+    await increaseTime(provider, 60 * 60 + 10)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
+    expect(await bullToken.totalSupply()).eq("9980000000000000000")
+    expect(await bearToken.balanceOf(user1.address)).eq("9980000000000000000")
+    expect(await bearToken.totalSupply()).eq("9980000000000000000")
+
+    await market.connect(user1).sell(bearToken.address, expandDecimals(5, 29), receiver0.address, false)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
+    expect(await bullToken.totalSupply()).eq("9980000000000000000")
+    expect(await bearToken.balanceOf(user1.address)).eq("4990000000000000000")
+    expect(await bearToken.totalSupply()).eq("4990000000000000000")
+
+    await increaseTime(provider, 60 * 60 + 10)
+    await mineBlock(provider)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("9979002000009979002")
+    expect(await bullToken.totalSupply()).eq("9979002000009979002")
+    expect(await bearToken.balanceOf(user1.address)).eq("4990997999960072016")
+    expect(await bearToken.totalSupply()).eq("4990997999960072016")
+
+    await increaseTime(provider, 10 * 60 * 60 + 10)
+    await mineBlock(provider)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("9969021999327489775")
+    expect(await bullToken.totalSupply()).eq("9969021999327489775")
+    expect(await bearToken.balanceOf(user1.address)).eq("5000977999876575862")
+    expect(await bearToken.totalSupply()).eq("5000977999876575862")
+  })
+
+  it("bears pay bulls", async () => {
+    const receiver0 = newWallet()
+
+    await market.connect(user0).buy(bullToken.address, false, { value: expandDecimals(10, 18) })
+    expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
+    expect(await bullToken.totalSupply()).eq("9980000000000000000")
+
+    await market.connect(user1).buy(bearToken.address, false, { value: expandDecimals(10, 18) })
+    expect(await bearToken.balanceOf(user1.address)).eq("9980000000000000000")
+    expect(await bearToken.totalSupply()).eq("9980000000000000000")
+
+    await increaseTime(provider, 60 * 60 + 10)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
+    expect(await bullToken.totalSupply()).eq("9980000000000000000")
+    expect(await bearToken.balanceOf(user1.address)).eq("9980000000000000000")
+    expect(await bearToken.totalSupply()).eq("9980000000000000000")
+
+    await market.connect(user0).sell(bullToken.address, expandDecimals(5, 29), receiver0.address, false)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("4990000000000000000")
+    expect(await bullToken.totalSupply()).eq("4990000000000000000")
+    expect(await bearToken.balanceOf(user1.address)).eq("9980000000000000000")
+    expect(await bearToken.totalSupply()).eq("9980000000000000000")
+
+    await increaseTime(provider, 60 * 60 + 10)
+    await mineBlock(provider)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("4990997999960072016")
+    expect(await bullToken.totalSupply()).eq("4990997999960072016")
+    expect(await bearToken.balanceOf(user1.address)).eq("9979002000009979002")
+    expect(await bearToken.totalSupply()).eq("9979002000009979002")
+
+    await increaseTime(provider, 10 * 60 * 60 + 10)
+    await mineBlock(provider)
+
+    expect(await bullToken.balanceOf(user0.address)).eq("5000977999876575862")
+    expect(await bullToken.totalSupply()).eq("5000977999876575862")
+    expect(await bearToken.balanceOf(user1.address)).eq("9969021999327489775")
+    expect(await bearToken.totalSupply()).eq("9969021999327489775")
   })
 })

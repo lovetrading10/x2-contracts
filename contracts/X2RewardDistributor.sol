@@ -5,7 +5,7 @@ pragma solidity 0.6.12;
 import "./libraries/math/SafeMath.sol";
 import "./libraries/token/IERC20.sol";
 
-contract X2TokenDistributor {
+contract X2RewardDistributor {
     using SafeMath for uint256;
 
     uint256 public constant DISTRIBUTION_INTERVAL = 1 hours;
