@@ -299,7 +299,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         uint256 _cumulativeRewardPerToken = cumulativeRewardPerToken;
         // only update cumulativeRewardPerToken when there are stakers, i.e. when _totalSupply > 0
         // if blockReward == 0, then there will be no change to cumulativeRewardPerToken
-        if (_totalSupply > 0 && blockReward > 0) {
+        if (_cachedTotalSupply > 0 && blockReward > 0) {
             // PRECISION is 10^20 and the BASE_DIVISOR is 10^10
             // cachedTotalSupply = _totalSupply * divisor
             // the divisor will be around 10^10
