@@ -5,7 +5,7 @@ pragma solidity 0.6.12;
 import "./libraries/math/SafeMath.sol";
 import "./interfaces/IX2Market.sol";
 import "./interfaces/IX2Token.sol";
-import "./interfaces/IX2TimeDistributor.sol";
+import "./interfaces/IX2RewardDistributor.sol";
 import "./libraries/token/IERC20.sol";
 
 contract X2Reader {
@@ -32,10 +32,10 @@ contract X2Reader {
             return amounts;
         }
 
-        amounts[0] = IX2TimeDistributor(distributor).ethPerInterval(_token);
+        amounts[0] = IX2RewardDistributor(distributor).tokensPerInterval(_token);
 
         uint256 rewards = IX2Token(_token).getReward(_account);
-        uint256 pendingRewards = IX2TimeDistributor(distributor).getDistributionAmount(_token);
+        uint256 pendingRewards = IX2RewardDistributor(distributor).getDistributionAmount(_token);
         uint256 balance = IX2Token(_token)._balanceOf(_account);
         uint256 cumulativeRewardPerToken = IX2Token(_token).cumulativeRewardPerToken();
 

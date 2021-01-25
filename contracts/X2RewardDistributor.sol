@@ -4,16 +4,17 @@ pragma solidity 0.6.12;
 
 import "./libraries/math/SafeMath.sol";
 import "./libraries/token/IERC20.sol";
+import "./interfaces/IX2RewardDistributor.sol";
 
-contract X2RewardDistributor {
+contract X2RewardDistributor is IX2RewardDistributor {
     using SafeMath for uint256;
 
     uint256 public constant DISTRIBUTION_INTERVAL = 1 hours;
     address public gov;
 
     mapping (address => address) public rewardTokens;
-    mapping (address => uint256) public tokensPerInterval;
-    mapping (address => uint256) public lastDistributionTime;
+    mapping (address => uint256) public override tokensPerInterval;
+    mapping (address => uint256) public override lastDistributionTime;
 
     event Distribute(address receiver, uint256 amount);
     event DistributionChange(address receiver, uint256 amount, address rewardToken);
@@ -63,7 +64,7 @@ contract X2RewardDistributor {
         return amount;
     }
 
-    function getDistributionAmount(address _receiver) public view returns (uint256) {
+    function getDistributionAmount(address _receiver) public override view returns (uint256) {
         uint256 _tokensPerInterval = tokensPerInterval[_receiver];
         if (_tokensPerInterval == 0) { return 0; }
 
