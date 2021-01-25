@@ -232,7 +232,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return uint256(answer);
     }
 
-    function getFunding() public view returns (uint256, uint256) {
+    function getFunding() public override view returns (uint256, uint256) {
         uint256 _lastPrice = uint256(lastPrice);
         uint256 nextPrice = latestPrice();
         (uint256 nextBullDivisor, uint256 nextBearDivisor) = getDivisors(_lastPrice, nextPrice);

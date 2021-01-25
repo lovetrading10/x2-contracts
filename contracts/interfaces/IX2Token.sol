@@ -4,6 +4,8 @@ pragma solidity 0.6.12;
 
 interface IX2Token {
     function cumulativeRewardPerToken() external view returns (uint256);
+    function lastBoughtAt(address account) external view returns (uint256);
+    function getPendingProfit(address account) external view returns (uint256);
     function distributor() external view returns (address);
     function rewardToken() external view returns (address);
     function _totalSupply() external view returns (uint256);

@@ -55,21 +55,21 @@ contract X2Reader {
     function getBalanceInfo(address _market, address _account) public view returns (uint256[] memory) {
         address bullToken = IX2Market(_market).bullToken();
         address bearToken = IX2Market(_market).bearToken();
-        uint256 nextPrice = IX2Market(_market).latestPrice();
-        uint256 lastPrice = uint256(IX2Market(_market).lastPrice());
-        (uint256 bullDivisor, uint256 bearDivisor) = IX2Market(_market).getDivisors(lastPrice, nextPrice);
+        (uint256 bullFunding, uint256 bearFunding) = IX2Market(_market).getFunding();
 
         uint256[] memory amounts = new uint256[](9);
 
         amounts[0] = _account.balance;
         amounts[1] = IERC20(bullToken).balanceOf(_account);
         amounts[2] = IERC20(bearToken).balanceOf(_account);
-        amounts[3] = bullDivisor;
-        amounts[4] = bearDivisor;
-        amounts[5] = uint256(IX2Token(bullToken).getDivisor());
-        amounts[6] = uint256(IX2Token(bearToken).getDivisor());
+        amounts[3] = IX2Token(bullToken).lastBoughtAt(_account);
+        amounts[4] = IX2Token(bearToken).lastBoughtAt(_account);
+        amounts[5] = IX2Token(bullToken).getPendingProfit(_account);
+        amounts[6] = IX2Token(bearToken).getPendingProfit(_account);
         amounts[7] = IX2Token(bullToken).costOf(_account);
         amounts[8] = IX2Token(bearToken).costOf(_account);
+        amounts[9] = bullFunding;
+        amounts[10] = bearFunding;
 
         return amounts;
     }

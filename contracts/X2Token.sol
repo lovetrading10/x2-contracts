@@ -41,7 +41,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
     uint256 constant MAX_BALANCE = uint128(-1);
     uint256 constant MAX_REWARD = uint96(-1);
     uint256 constant MAX_CUMULATIVE_REWARD = uint128(-1);
-    uint256 constant MAX_BURN_POINTS = 1e30;
+    uint256 constant MAX_QUANTITY_POINTS = 1e30;
 
     string public name = "X2";
     string public symbol = "X2";
@@ -148,7 +148,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return IX2Market(market).getDivisor(address(this));
     }
 
-    function lastBoughtAt(address _account) public view returns (uint256) {
+    function lastBoughtAt(address _account) public override view returns (uint256) {
         return uint256(rewards[_account].lastBoughtAt);
     }
 
@@ -156,7 +156,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
         return lastBoughtAt(_account) > block.timestamp.sub(HOLDING_TIME);
     }
 
-    function getPendingProfit(address _account) public view returns (uint256) {
+    function getPendingProfit(address _account) public override view returns (uint256) {
         if (!hasPendingPurchase(_account)) {
             return 0;
         }
@@ -214,7 +214,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
 
         Ledger memory ledger = ledgers[_account];
         uint256 balance = uint256(ledger.balance).div(divisor);
-        uint256 amount = balance.mul(_burnPoints).div(MAX_BURN_POINTS);
+        uint256 amount = balance.mul(_burnPoints).div(MAX_QUANTITY_POINTS);
         uint256 scaledAmount = amount;
 
         if (hasPendingPurchase(_account) && balance > ledger.cost) {
@@ -222,7 +222,7 @@ contract X2Token is IERC20, IX2Token, ReentrancyGuard {
             // is greater than their cost, it means they have a pending profit
             // we scale up the amount to burn the proportional amount of
             // pending profit
-            amount = uint256(ledger.cost).mul(_burnPoints).div(MAX_BURN_POINTS);
+            amount = uint256(ledger.cost).mul(_burnPoints).div(MAX_QUANTITY_POINTS);
             scaledAmount = amount.mul(balance).div(ledger.cost);
         }
 
