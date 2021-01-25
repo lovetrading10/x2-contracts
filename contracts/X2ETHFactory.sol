@@ -26,7 +26,6 @@ contract X2ETHFactory is IX2ETHFactory {
         uint256 maxProfitBasisPoints,
         uint256 fundingDivisor,
         uint256 appFeeBasisPoints,
-        address appFeeReceiver,
         uint256 index
     );
 
@@ -37,7 +36,7 @@ contract X2ETHFactory is IX2ETHFactory {
     event InfoChange(address token, string name, string symbol);
     event FundingChange(address market, uint256 fundingDivisor);
     event AppOwnerChange(address appOwner);
-    event AppFeeChange(address market, uint256 feeBasisPoints, address feeReceiver);
+    event AppFeeChange(address market, uint256 feeBasisPoints);
 
     modifier onlyGov() {
         require(msg.sender == gov, "X2ETHFactory: forbidden");
@@ -77,9 +76,9 @@ contract X2ETHFactory is IX2ETHFactory {
         emit AppOwnerChange(appOwner);
     }
 
-    function setAppFee(address _market, uint256 _appFeeBasisPoints, address _appFeeReceiver) external onlyAppOwner {
-        IX2Market(_market).setAppFee(_appFeeBasisPoints, _appFeeReceiver);
-        emit AppFeeChange(_market, _appFeeBasisPoints, _appFeeReceiver);
+    function setAppFee(address _market, uint256 _appFeeBasisPoints) external onlyAppOwner {
+        IX2Market(_market).setAppFee(_appFeeBasisPoints);
+        emit AppFeeChange(_market, _appFeeBasisPoints);
     }
 
     function setFeeReceiver(address _feeReceiver) external onlyGov {
@@ -111,8 +110,7 @@ contract X2ETHFactory is IX2ETHFactory {
         uint256 _multiplierBasisPoints,
         uint256 _maxProfitBasisPoints,
         uint256 _fundingDivisor,
-        uint256 _appFeeBasisPoints,
-        address _appFeeReceiver
+        uint256 _appFeeBasisPoints
     ) external returns (address, address, address) {
         require(msg.sender == gov || msg.sender == appOwner, "X2ETHFactory: forbidden");
 
@@ -123,8 +121,7 @@ contract X2ETHFactory is IX2ETHFactory {
             _multiplierBasisPoints,
             _maxProfitBasisPoints,
             _fundingDivisor,
-            _appFeeBasisPoints,
-            _appFeeReceiver
+            _appFeeBasisPoints
         );
 
         X2Token bullToken = new X2Token();
@@ -144,7 +141,6 @@ contract X2ETHFactory is IX2ETHFactory {
             _maxProfitBasisPoints,
             _fundingDivisor,
             _appFeeBasisPoints,
-            _appFeeReceiver,
             markets.length - 1
         );
 

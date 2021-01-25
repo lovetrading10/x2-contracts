@@ -9,7 +9,7 @@ interface IX2Market {
     function lastPrice() external view returns (uint256);
     function getDivisor(address token) external view returns (uint256);
     function getDivisors(uint256 _lastPrice, uint256 _nextPrice) external view returns (uint256, uint256);
-    function setAppFee(uint256 feeBasisPoints, address feeReceiver) external;
+    function setAppFee(uint256 feeBasisPoints) external;
     function setFunding(uint256 divisor) external;
     function cachedBullDivisor() external view returns (uint128);
     function cachedBearDivisor() external view returns (uint128);

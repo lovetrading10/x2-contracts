@@ -98,15 +98,15 @@ describe("X2Token", function () {
     expect(await bullToken.balanceOf(user0.address)).eq(30)
     expect(await bullToken.balanceOf(user1.address)).eq(70)
 
-    await expect(market.connect(user0).sell(bullToken.address, expandDecimals(1, 31), receiver0.address, false))
+    await expect(market.connect(user0).sell(bullToken.address, expandDecimals(1, 31), receiver0.address, ethers.constants.AddressZero))
       .to.be.revertedWith("SafeMath: subtraction overflow")
 
     expect(await provider.getBalance(receiver0.address)).eq(0)
-    await market.connect(user0).sell(bullToken.address, expandDecimals(1, 30), receiver0.address, false)
+    await market.connect(user0).sell(bullToken.address, expandDecimals(1, 30), receiver0.address, ethers.constants.AddressZero)
     expect(await provider.getBalance(receiver0.address)).eq(30)
 
     expect(await provider.getBalance(receiver1.address)).eq(0)
-    await market.connect(user1).sell(bullToken.address, expandDecimals(1, 30), receiver1.address, false)
+    await market.connect(user1).sell(bullToken.address, expandDecimals(1, 30), receiver1.address, ethers.constants.AddressZero)
     expect(await provider.getBalance(receiver1.address)).eq(70)
   })
 
@@ -152,7 +152,7 @@ describe("X2Token", function () {
     await distributor.setDistribution([bullToken.address], [expandDecimals(20, 18)], [feeSplitToken.address])
 
     expect(await bullToken.totalSupply()).eq(0)
-    await market.connect(user0).buy(bullToken.address, false, { value: 1000000000000 })
+    await market.connect(user0).buy(bullToken.address, ethers.constants.AddressZero, { value: 1000000000000 })
     expect(await bullToken.balanceOf(user0.address)).eq(998000000000)
     expect(await bullToken.totalSupply()).eq(998000000000)
 
@@ -186,11 +186,11 @@ describe("X2Token", function () {
     await distributor.setDistribution([bullToken.address], [expandDecimals(20, 18)], [feeSplitToken.address])
 
     expect(await bullToken.totalSupply()).eq(0)
-    await market.connect(user0).buy(bullToken.address, false, { value: expandDecimals(10, 18) })
+    await market.connect(user0).buy(bullToken.address, ethers.constants.AddressZero, { value: expandDecimals(10, 18) })
     expect(await bullToken.balanceOf(user0.address)).eq("9980000000000000000")
     expect(await bullToken.totalSupply()).eq("9980000000000000000")
 
-    await market.connect(user1).buy(bullToken.address, false, { value: expandDecimals(90, 18) })
+    await market.connect(user1).buy(bullToken.address, ethers.constants.AddressZero, { value: expandDecimals(90, 18) })
     expect(await bullToken.balanceOf(user1.address)).eq("89820000000000000000")
     expect(await bullToken.totalSupply()).eq("99800000000000000000")
 

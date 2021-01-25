@@ -101,22 +101,20 @@ describe("X2ETHFactory", function () {
 
   it("setAppFee", async () => {
     expect(await factory.gov()).eq(wallet.address)
-    await expect(factory.connect(wallet).setAppFee(market.address, 10, user2.address))
+    await expect(factory.connect(wallet).setAppFee(market.address, 10))
       .to.be.revertedWith("X2ETHFactory: forbidden")
-    await expect(factory.connect(user1).setAppFee(market.address, 10, user2.address))
+    await expect(factory.connect(user1).setAppFee(market.address, 10))
       .to.be.revertedWith("X2ETHFactory: forbidden")
 
     await factory.setAppOwner(user1.address)
     expect(await factory.appOwner()).eq(user1.address)
 
-    await expect(factory.connect(user1).setAppFee(market.address, 21, user2.address))
+    await expect(factory.connect(user1).setAppFee(market.address, 21))
       .to.be.revertedWith("X2ETHMarket: fee limit exceeded")
 
     expect(await market.appFeeBasisPoints()).eq(10)
-    expect(await market.appFeeReceiver()).eq(ethers.constants.AddressZero)
-    await factory.connect(user1).setAppFee(market.address, 20, user2.address)
+    await factory.connect(user1).setAppFee(market.address, 20)
     expect(await market.appFeeBasisPoints()).eq(20)
-    expect(await market.appFeeReceiver()).eq(user2.address)
   })
 
   it("setFeeReceiver", async () => {
@@ -183,8 +181,7 @@ describe("X2ETHFactory", function () {
       50000, // multiplierBasisPoints, 500%
       10000, // maxProfitBasisPoints, 100%
       1000, // fundingDivisor
-      5, // appFeeBasisPoints
-      user2.address
+      5 // appFeeBasisPoints
     )
     await reportGasUsed(provider, tx, "createMarket gas used")
 

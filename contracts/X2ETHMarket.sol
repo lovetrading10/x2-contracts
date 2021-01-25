@@ -44,7 +44,6 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint256 public feeReserve;
 
     uint256 public appFeeBasisPoints;
-    address public appFeeReceiver;
     uint256 public appFeeReserve;
 
     uint256 public fundingDivisor;
@@ -53,6 +52,8 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     uint256 public override lastPrice;
 
     bool public isInitialized;
+
+    mapping (address => uint256) public appFees;
 
     event DistributeFees(address feeReceiver, uint256 amount);
     event DistributeInterest(address feeReceiver, uint256 amount);
@@ -69,8 +70,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         uint256 _multiplierBasisPoints,
         uint256 _maxProfitBasisPoints,
         uint256 _fundingDivisor,
-        uint256 _appFeeBasisPoints,
-        address _appFeeReceiver
+        uint256 _appFeeBasisPoints
     ) public {
         require(!isInitialized, "X2ETHMarket: already initialized");
         require(_maxProfitBasisPoints <= BASIS_POINTS_DIVISOR, "X2ETHMarket: maxProfitBasisPoints limit exceeded");
@@ -81,7 +81,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         multiplierBasisPoints = _multiplierBasisPoints;
         maxProfitBasisPoints = _maxProfitBasisPoints;
         setFunding(_fundingDivisor);
-        setAppFee(_appFeeBasisPoints, _appFeeReceiver);
+        setAppFee(_appFeeBasisPoints);
 
         lastPrice = uint176(latestPrice());
         require(lastPrice != 0, "X2ETHMarket: unsupported price feed");
@@ -89,10 +89,9 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         _updateLastFundingTime();
     }
 
-    function setAppFee(uint256 _appFeeBasisPoints, address _appFeeReceiver) public override onlyFactory {
+    function setAppFee(uint256 _appFeeBasisPoints) public override onlyFactory {
         require(_appFeeBasisPoints <= MAX_APP_FEE_BASIS_POINTS, "X2ETHMarket: fee limit exceeded");
         appFeeBasisPoints = _appFeeBasisPoints;
-        appFeeReceiver = _appFeeReceiver;
     }
 
     function setFunding(uint256 _fundingDivisor) public override onlyFactory {
@@ -112,12 +111,12 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         cachedBearDivisor = INITIAL_REBASE_DIVISOR;
     }
 
-    function buy(address _token, bool _hasAppFee) public payable nonReentrant returns (uint256) {
-        return _buy(_token, msg.sender, _hasAppFee);
+    function buy(address _token, address _appFeeReceiver) public payable nonReentrant returns (uint256) {
+        return _buy(_token, msg.sender, _appFeeReceiver);
     }
 
-    function sell(address _token, uint256 _sellPoints, address _receiver, bool _hasAppFee) public nonReentrant returns (uint256) {
-        return _sell(_token, _sellPoints, _receiver, true, _hasAppFee);
+    function sell(address _token, uint256 _sellPoints, address _receiver, address _appFeeReceiver) public nonReentrant returns (uint256) {
+        return _sell(_token, _sellPoints, _receiver, true, _appFeeReceiver);
     }
 
     // since an X2Token's distributor can be set by the factory's gov,
@@ -126,11 +125,11 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     // this ensures that tokens can always be sold even if the distributor
     // is set to an address that intentionally fails when `distribute` is called
     function sellWithoutDistribution(address _token, uint256 _sellPoints, address _receiver) public nonReentrant returns (uint256) {
-        return _sell(_token, _sellPoints, _receiver, false, false);
+        return _sell(_token, _sellPoints, _receiver, false, address(0));
     }
 
-    function flip(address _token, uint256 _flipPoints) public nonReentrant returns (uint256) {
-        return _flip(_token, _flipPoints, msg.sender);
+    function flip(address _token, uint256 _flipPoints, address _appFeeReceiver) public nonReentrant returns (uint256) {
+        return _flip(_token, _flipPoints, msg.sender, _appFeeReceiver);
     }
 
     function rebase() public returns (bool) {
@@ -167,16 +166,19 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return fees;
     }
 
-    function distributeAppFees() public nonReentrant returns (uint256) {
-        require(appFeeReceiver != address(0), "X2Market: empty feeReceiver");
+    function distributeAppFees(address _appFeeReceiver) public nonReentrant returns (uint256) {
+        require(_appFeeReceiver != address(0), "X2Market: empty feeReceiver");
 
-        uint256 fees = appFeeReserve;
-        appFeeReserve = 0;
+        uint256 fees = appFees[_appFeeReceiver];
+        if (fees == 0) { return 0; }
 
-        (bool success,) = appFeeReceiver.call{value: fees}("");
+        appFeeReserve = appFeeReserve.sub(fees);
+        appFees[_appFeeReceiver] = 0;
+
+        (bool success,) = _appFeeReceiver.call{value: fees}("");
         require(success, "X2ETHMarket: transfer failed");
 
-        emit DistributeFees(appFeeReceiver, fees);
+        emit DistributeFees(_appFeeReceiver, fees);
 
         return fees;
     }
@@ -317,16 +319,17 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return fee;
     }
 
-    function _collectAppFees(uint256 _amount) private returns (uint256) {
+    function _collectAppFees(uint256 _amount, address _appFeeReceiver) private returns (uint256) {
         if (appFeeBasisPoints == 0) {
             return 0;
         }
         uint256 fee = _amount.mul(appFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
+        appFees[_appFeeReceiver] = appFees[_appFeeReceiver].add(fee);
         appFeeReserve = appFeeReserve.add(fee);
         return fee;
     }
 
-    function _buy(address _token, address _receiver, bool _hasAppFee) private returns (uint256) {
+    function _buy(address _token, address _receiver, address _appFeeReceiver) private returns (uint256) {
         bool isBull = _token == bullToken;
         require(isBull || _token == bearToken, "X2ETHMarket: unsupported token");
         uint256 amount = msg.value;
@@ -335,7 +338,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         rebase();
 
         uint256 fee = _collectFees(amount);
-        uint256 appFee = _hasAppFee ? _collectAppFees(amount) : 0;
+        uint256 appFee = _appFeeReceiver == address(0) ? 0 : _collectAppFees(amount, _appFeeReceiver);
         uint256 depositAmount = amount.sub(fee).sub(appFee);
 
         IX2Token(_token).mint(_receiver, depositAmount, isBull ? cachedBullDivisor : cachedBearDivisor);
@@ -343,7 +346,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return depositAmount;
     }
 
-    function _sell(address _token, uint256 _sellPoints, address _receiver, bool _distribute, bool _hasAppFee) private returns (uint256) {
+    function _sell(address _token, uint256 _sellPoints, address _receiver, bool _distribute, address _appFeeReceiver) private returns (uint256) {
         require(_sellPoints > 0, "X2ETHMarket: insufficient amount");
         require(_token == bullToken || _token == bearToken, "X2ETHMarket: unsupported token");
         rebase();
@@ -351,7 +354,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         uint256 amount = IX2Token(_token).burn(msg.sender, _sellPoints, _distribute);
 
         uint256 fee = _collectFees(amount);
-        uint256 appFee = _hasAppFee ? _collectAppFees(amount) : 0;
+        uint256 appFee = _appFeeReceiver == address(0) ? 0 : _collectAppFees(amount, _appFeeReceiver);
 
         uint256 withdrawAmount = amount.sub(fee).sub(appFee);
         (bool success,) = _receiver.call{value: withdrawAmount}("");
@@ -360,7 +363,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return withdrawAmount;
     }
 
-    function _flip(address _token, uint256 _flipPoints, address _receiver) private returns (uint256) {
+    function _flip(address _token, uint256 _flipPoints, address _receiver, address _appFeeReceiver) private returns (uint256) {
         require(_flipPoints > 0, "X2ETHMarket: insufficient amount");
 
         bool sellBull = _token == bullToken;
@@ -370,7 +373,8 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         uint256 amount = IX2Token(_token).burn(msg.sender, _flipPoints, true);
 
         uint256 fee = _collectFees(amount);
-        uint256 flipAmount = amount.sub(fee);
+        uint256 appFee = _appFeeReceiver == address(0) ? 0 : _collectAppFees(amount, _appFeeReceiver);
+        uint256 flipAmount = amount.sub(fee).sub(appFee);
 
         // if bull tokens were burnt then mint bear tokens
         // if bear tokens were burnt then mint bull tokens

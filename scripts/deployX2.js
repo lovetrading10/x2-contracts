@@ -2,7 +2,7 @@ const { expandDecimals } = require("../test/shared/utilities")
 const { sendTxn, deployContract, contractAt } = require("./helpers")
 
 async function createMarket({ factory, priceFeed, multiplierBasisPoints,
-  maxProfitBasisPoints, fundingDivisor, appFeeBasisPoints, appFeeReceiver,
+  maxProfitBasisPoints, fundingDivisor, appFeeBasisPoints,
   bullName, bullSymbol, bearName, bearSymbol, label
 }) {
 
@@ -11,8 +11,7 @@ async function createMarket({ factory, priceFeed, multiplierBasisPoints,
     multiplierBasisPoints,
     maxProfitBasisPoints,
     fundingDivisor,
-    appFeeBasisPoints,
-    appFeeReceiver
+    appFeeBasisPoints
   ), label)
 
   const marketsLength = await factory.marketsLength()
@@ -55,7 +54,6 @@ async function main() {
     maxProfitBasisPoints: 9000, // 90%
     fundingDivisor: 5000,
     appFeeBasisPoints: 10,
-    appFeeReceiver: ethers.constants.AddressZero,
     bullName: "3X ETH/USD BULL",
     bullSymbol: "X2:BULL",
     bearName: "3X ETH/USD BEAR",

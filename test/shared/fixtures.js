@@ -23,8 +23,7 @@ async function loadETHFixtures(provider) {
       30000, // multiplierBasisPoints, 300%
       9000, // maxProfitBasisPoints, 90%
       5000, // fundingDivisor
-      10, // appFeeBasisPoints, 0.1%
-      ethers.constants.AddressZero
+      10 // appFeeBasisPoints, 0.1%
   )
 
   const marketAddress = await factory.markets(0)
