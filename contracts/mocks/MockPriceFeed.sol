@@ -5,8 +5,11 @@ pragma solidity 0.6.12;
 import "../interfaces/IX2PriceFeed.sol";
 
 contract MockPriceFeed is IX2PriceFeed {
-    int256 answer;
-    uint80 roundId;
+    int256 public answer;
+    uint80 public roundId;
+    string public description = "MockPriceFeed";
+    address public aggregator;
+
     mapping (uint80 => int256) answers;
 
     function latestAnswer() public override view returns (int256) {
