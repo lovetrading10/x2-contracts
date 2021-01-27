@@ -6,8 +6,9 @@ import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 import "../interfaces/IX2Fund.sol";
+import "../interfaces/IX2Farm.sol";
 
-contract Farm is ReentrancyGuard, IERC20 {
+contract Farm is ReentrancyGuard, IERC20, IX2Farm {
     using SafeMath for uint256;
 
     string public constant name = "XVIX UNI Farm";
@@ -24,9 +25,9 @@ contract Farm is ReentrancyGuard, IERC20 {
 
     mapping (address => uint256) public balances;
 
-    uint256 public cumulativeRewardPerToken;
-    mapping (address => uint256) public claimableReward;
-    mapping (address => uint256) public previousCumulatedRewardPerToken;
+    uint256 public override cumulativeRewardPerToken;
+    mapping (address => uint256) public override claimableReward;
+    mapping (address => uint256) public override previousCumulatedRewardPerToken;
 
     event Deposit(address account, uint256 amount);
     event Withdraw(address account, uint256 amount);

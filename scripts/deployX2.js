@@ -44,8 +44,8 @@ async function createMarket({ factory, priceFeed, multiplierBasisPoints,
 
 async function main() {
   const factory = await deployContract("X2ETHFactory", [])
-  // const priceFeed = { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" } // MAINNET
-  const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" } // KOVAN
+  const priceFeed = { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" } // MAINNET
+  // const priceFeed = { address: "0x9326BFA02ADD2366b30bacB125260Af641031331" } // KOVAN
 
   const { market, bullToken, bearToken } = await createMarket({
     factory,
