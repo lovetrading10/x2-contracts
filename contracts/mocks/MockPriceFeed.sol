@@ -8,7 +8,7 @@ contract MockPriceFeed is IX2PriceFeed {
     int256 public answer;
     uint80 public roundId;
     string public description = "MockPriceFeed";
-    address public aggregator;
+    address public override aggregator;
 
     mapping (uint80 => int256) answers;
 

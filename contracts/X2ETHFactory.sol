@@ -76,7 +76,7 @@ contract X2ETHFactory is IX2ETHFactory {
         emit AppOwnerChange(appOwner);
     }
 
-    function setAppFee(address _market, uint256 _appFeeBasisPoints) external onlyAppOwner {
+    function setAppFee(address _market, uint256 _appFeeBasisPoints) external override onlyAppOwner {
         IX2Market(_market).setAppFee(_appFeeBasisPoints);
         emit AppFeeChange(_market, _appFeeBasisPoints);
     }
@@ -111,7 +111,7 @@ contract X2ETHFactory is IX2ETHFactory {
         uint256 _maxProfitBasisPoints,
         uint256 _fundingDivisor,
         uint256 _appFeeBasisPoints
-    ) external returns (address, address, address) {
+    ) external override returns (address, address, address) {
         require(msg.sender == gov || msg.sender == appOwner, "X2ETHFactory: forbidden");
 
         X2ETHMarket market = new X2ETHMarket();
