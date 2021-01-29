@@ -7,7 +7,7 @@ import "../interfaces/IX2PriceFeed.sol";
 contract MockPriceFeed is IX2PriceFeed {
     int256 public answer;
     uint80 public roundId;
-    string public description = "MockPriceFeed";
+    string public override description = "MockPriceFeed";
     address public override aggregator;
 
     mapping (uint80 => int256) answers;

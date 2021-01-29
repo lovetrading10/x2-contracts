@@ -3,6 +3,8 @@
 pragma solidity 0.6.12;
 
 interface IX2ETHFactory {
+    function marketsLength() external view returns (uint256);
+    function markets(uint256 index) external view returns (address);
     function feeReceiver() external view returns (address);
     function interestReceiver() external view returns (address);
     function setAppFee(address market, uint256 appFeeBasisPoints) external;

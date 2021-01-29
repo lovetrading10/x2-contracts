@@ -38,8 +38,8 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
 
     address public override bullToken;
     address public override bearToken;
-    address public priceFeed;
-    uint256 public multiplierBasisPoints;
+    address public override priceFeed;
+    uint256 public override multiplierBasisPoints;
     uint256 public maxProfitBasisPoints;
     uint256 public feeReserve;
 

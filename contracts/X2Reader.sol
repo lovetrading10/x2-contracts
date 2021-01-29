@@ -4,6 +4,8 @@ pragma solidity 0.6.12;
 
 import "./libraries/math/SafeMath.sol";
 import "./interfaces/IX2Market.sol";
+import "./interfaces/IX2ETHFactory.sol";
+import "./interfaces/IX2PriceFeed.sol";
 import "./interfaces/IX2Token.sol";
 import "./interfaces/IX2RewardDistributor.sol";
 import "./libraries/token/IERC20.sol";
@@ -11,6 +13,21 @@ import "./libraries/token/IERC20.sol";
 contract X2Reader {
     using SafeMath for uint256;
     uint256 constant PRECISION = 1e20;
+
+    function getMarkets(address _factory, uint256 _start) public view returns (uint256[] memory, address[] memory) {
+        uint256 length = IX2ETHFactory(_factory).marketsLength();
+        uint256[] memory leverages = new uint256[](length - _start);
+        address[] memory priceFeeds = new address[](length - _start);
+        for (uint256 i = _start; i < length; i++) {
+            address market = IX2ETHFactory(_factory).markets(i);
+            uint256 multiplierBasisPoints = IX2Market(market).multiplierBasisPoints();
+            address priceFeed = IX2Market(market).priceFeed();
+            leverages[i - _start] = multiplierBasisPoints;
+            priceFeeds[i - _start] = priceFeed;
+        }
+
+        return (leverages, priceFeeds);
+    }
 
     function getMarketInfo(address _market) public view returns (uint256[] memory) {
         address bullToken = IX2Market(_market).bullToken();

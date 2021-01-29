@@ -3,6 +3,7 @@
 pragma solidity 0.6.12;
 
 interface IX2PriceFeed {
+    function description() external view returns (string memory);
     function aggregator() external view returns (address);
     function latestAnswer() external view returns (int256);
     function latestRound() external view returns (uint80);

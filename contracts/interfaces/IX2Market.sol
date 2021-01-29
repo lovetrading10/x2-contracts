@@ -3,6 +3,8 @@
 pragma solidity 0.6.12;
 
 interface IX2Market {
+    function priceFeed() external view returns (address);
+    function multiplierBasisPoints() external view returns (uint256);
     function bullToken() external view returns (address);
     function bearToken() external view returns (address);
     function latestPrice() external view returns (uint256);

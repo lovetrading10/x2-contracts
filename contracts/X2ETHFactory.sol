@@ -18,7 +18,7 @@ contract X2ETHFactory is IX2ETHFactory {
     address public override feeReceiver;
     address public override interestReceiver;
 
-    address[] public markets;
+    address[] public override markets;
 
     event CreateMarket(
         address priceFeed,
@@ -52,7 +52,7 @@ contract X2ETHFactory is IX2ETHFactory {
         gov = msg.sender;
     }
 
-    function marketsLength() external view returns (uint256) {
+    function marketsLength() external override view returns (uint256) {
         return markets.length;
     }
 

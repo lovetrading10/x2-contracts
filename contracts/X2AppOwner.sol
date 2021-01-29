@@ -7,6 +7,7 @@ import "./interfaces/IX2PriceFeed.sol";
 
 contract X2AppOwner {
     address public gov;
+    mapping (bytes32 => bool) public marketHashes;
 
     event CreateMarket(
         address priceFeed,
@@ -26,7 +27,6 @@ contract X2AppOwner {
         _;
     }
 
-
     constructor() public {
         gov = msg.sender;
     }
@@ -41,7 +41,16 @@ contract X2AppOwner {
         uint256 _multiplierBasisPoints,
         string calldata _note
     ) external {
-        require(_multiplierBasisPoints % 5000 == 0, "X2AppOwner: Invalid multiplierBasisPoints");
+        require(_multiplierBasisPoints % 5000 == 0, "X2AppOwner: invalid multiplierBasisPoints");
+        {
+        bytes32 marketHash = keccak256(abi.encodePacked(
+            _factory,
+            _priceFeed,
+            _multiplierBasisPoints
+        ));
+        require(!marketHashes[marketHash], "X2AppOwner: market already created");
+        marketHashes[marketHash] = true;
+        }
 
         (address market, address bullToken, address bearToken) = IX2ETHFactory(_factory).createMarket(
             _priceFeed,
