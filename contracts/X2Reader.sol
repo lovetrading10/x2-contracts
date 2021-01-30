@@ -29,6 +29,40 @@ contract X2Reader {
         return (leverages, priceFeeds);
     }
 
+    function getFees(address[] memory _markets) public view returns (uint256) {
+        uint256 totalFees = 0;
+        for (uint256 i = 0; i < _markets.length; i++) {
+            address market = _markets[i];
+            totalFees = totalFees.add(IX2Market(market).feeReserve());
+        }
+
+        return totalFees;
+    }
+
+    function distributeFees(address[] memory _markets) public returns (uint256) {
+        for (uint256 i = 0; i < _markets.length; i++) {
+            address market = _markets[i];
+            IX2Market(market).distributeFees();
+        }
+    }
+
+    function getAppFees(address[] memory _markets, address app) public view returns (uint256) {
+        uint256 totalFees = 0;
+        for (uint256 i = 0; i < _markets.length; i++) {
+            address market = _markets[i];
+            totalFees = totalFees.add(IX2Market(market).appFees(app));
+        }
+
+        return totalFees;
+    }
+
+    function distributeAppFees(address[] memory _markets, address app) public returns (uint256) {
+        for (uint256 i = 0; i < _markets.length; i++) {
+            address market = _markets[i];
+            IX2Market(market).distributeAppFees(app);
+        }
+    }
+
     function getMarketInfo(address _market) public view returns (uint256[] memory) {
         address bullToken = IX2Market(_market).bullToken();
         address bearToken = IX2Market(_market).bearToken();

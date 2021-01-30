@@ -41,7 +41,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
     address public override priceFeed;
     uint256 public override multiplierBasisPoints;
     uint256 public maxProfitBasisPoints;
-    uint256 public feeReserve;
+    uint256 public override feeReserve;
 
     uint256 public appFeeBasisPoints;
     uint256 public appFeeReserve;
@@ -53,7 +53,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
 
     bool public isInitialized;
 
-    mapping (address => uint256) public appFees;
+    mapping (address => uint256) public override appFees;
 
     event DistributeFees(address feeReceiver, uint256 amount);
     event DistributeInterest(address feeReceiver, uint256 amount);
@@ -151,7 +151,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return true;
     }
 
-    function distributeFees() public nonReentrant returns (uint256) {
+    function distributeFees() public override nonReentrant returns (uint256) {
         address feeReceiver = IX2ETHFactory(factory).feeReceiver();
         require(feeReceiver != address(0), "X2Market: empty feeReceiver");
 
@@ -166,7 +166,7 @@ contract X2ETHMarket is ReentrancyGuard, IX2Market {
         return fees;
     }
 
-    function distributeAppFees(address _appFeeReceiver) public nonReentrant returns (uint256) {
+    function distributeAppFees(address _appFeeReceiver) public override nonReentrant returns (uint256) {
         require(_appFeeReceiver != address(0), "X2Market: empty feeReceiver");
 
         uint256 fees = appFees[_appFeeReceiver];
