@@ -24,9 +24,6 @@ async function main() {
     fundingDivisor: (await market.fundingDivisor()).toNumber(),
     appFeeBasisPoints: (await market.appFeeBasisPoints()).toNumber()
   }
-  if (marketInfo.leverage !== 3) {
-    throw new Error("Unexpected leverage")
-  }
   if (marketInfo.maxProfit !== 90) {
     throw new Error("Unexpected maxProfit")
   }
@@ -53,6 +50,17 @@ async function main() {
     name: "${marketInfo.name}",
     priceFeed: "${priceFeed.address}",
     aggregator: "${marketInfo.priceFeed.aggregator}"
+  }`)
+  console.info("--------------")
+  console.info(`{
+    name: "${marketInfo.leverage}X ${marketInfo.name}",
+    address: "${marketInfo.address}",
+    bullToken: "${bullToken}",
+    bearToken: "${bearToken}",
+    label: "${marketInfo.name}",
+    leverage: ${marketInfo.leverage},
+    priceFeed: "${priceFeed.address}",
+    aggregator: "${marketInfo.priceFeed.aggregator}",
   }`)
 }
 
