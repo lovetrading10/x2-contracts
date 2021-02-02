@@ -59,8 +59,7 @@ async function main() {
     bearToken: "${bearToken}",
     label: "${marketInfo.name}",
     leverage: ${marketInfo.leverage},
-    priceFeed: "${priceFeed.address}",
-    aggregator: "${marketInfo.priceFeed.aggregator}",
+    priceFeed: "${priceFeed.address}"
   }`)
 }
 
