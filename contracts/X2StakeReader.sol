@@ -12,6 +12,21 @@ contract X2StakeReader {
 
     uint256 constant PRECISION = 1e30;
 
+    function getTokenInfo(
+        address _farm,
+        address _stakingToken,
+        address _account
+    ) public view returns (uint256[] memory) {
+        uint256[] memory amounts = new uint256[](4);
+
+        amounts[0] = IERC20(_farm).totalSupply();
+        amounts[1] = IERC20(_stakingToken).balanceOf(_account);
+        amounts[2] = IERC20(_farm).balanceOf(_account);
+        amounts[3] = IERC20(_stakingToken).allowance(_account, _farm);
+
+        return amounts;
+    }
+
     function getStakeInfo(
         address _xlgeFarm,
         address _uniFarm,
