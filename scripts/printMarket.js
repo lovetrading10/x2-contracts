@@ -53,11 +53,11 @@ async function main() {
   }`)
   console.info("--------------")
   console.info(`{
-    name: "${marketInfo.leverage}X ${marketInfo.name}",
+    name: "${marketInfo.leverage}X ${marketInfo.name.replace("_", "/")}",
     address: "${marketInfo.address}",
     bullToken: "${bullToken}",
     bearToken: "${bearToken}",
-    label: "${marketInfo.name}",
+    label: "${marketInfo.name.replace("_", "/")}",
     leverage: ${marketInfo.leverage},
     priceFeed: "${priceFeed.address}"
   }`)
