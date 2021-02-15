@@ -80,4 +80,25 @@ contract X2StakeReader {
 
         return amounts;
     }
+
+    function getRawRewards(address _farm, address _account, address _distributor) public view returns (uint256[] memory) {
+        uint256[] memory amounts = new uint256[](2);
+
+        amounts[0] = IX2TimeDistributor(_distributor).ethPerInterval(_farm);
+
+        uint256 balance = IX2Farm(_farm).balances(_account);
+        uint256 supply = IERC20(_farm).totalSupply();
+        uint256 pendingRewards = IX2TimeDistributor(_distributor).getDistributionAmount(_farm);
+        uint256 cumulativeRewardPerToken = IX2Farm(_farm).cumulativeRewardPerToken();
+        uint256 claimableReward = IX2Farm(_farm).claimableReward(_account);
+        uint256 previousCumulatedRewardPerToken = IX2Farm(_farm).previousCumulatedRewardPerToken(_account);
+
+        if (supply > 0) {
+            uint256 rewards = claimableReward.add(pendingRewards.mul(balance).div(supply));
+            uint256 additionalRewards = balance.mul(cumulativeRewardPerToken.sub(previousCumulatedRewardPerToken)).div(PRECISION);
+            amounts[1] = rewards.add(additionalRewards);
+        }
+
+        return amounts;
+    }
 }

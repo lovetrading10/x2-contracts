@@ -23,7 +23,7 @@ contract Farm is ReentrancyGuard, IERC20, IX2Farm {
 
     uint256 public override totalSupply;
 
-    mapping (address => uint256) public balances;
+    mapping (address => uint256) public override balances;
 
     uint256 public override cumulativeRewardPerToken;
     mapping (address => uint256) public override claimableReward;
