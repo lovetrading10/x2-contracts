@@ -8,8 +8,9 @@ import "../libraries/utils/ReentrancyGuard.sol";
 import "../interfaces/IXVIX.sol";
 import "../interfaces/IFloor.sol";
 import "../interfaces/IX2Fund.sol";
+import "../interfaces/IBurnVault.sol";
 
-contract BurnVault is ReentrancyGuard, IERC20 {
+contract BurnVault is ReentrancyGuard, IERC20, IBurnVault {
     using SafeMath for uint256;
 
     string public constant name = "XVIX BurnVault";
@@ -72,7 +73,7 @@ contract BurnVault is ReentrancyGuard, IERC20 {
         senders[_sender] = false;
     }
 
-    function deposit(uint256 _amount) external nonReentrant {
+    function deposit(uint256 _amount) external override nonReentrant {
         require(_amount > 0, "BurnVault: insufficient amount");
 
         address account = msg.sender;
