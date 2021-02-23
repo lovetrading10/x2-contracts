@@ -23,6 +23,7 @@ contract GmtSwap is ReentrancyGuard {
     address public wethXvixUni;
     address public allocator;
     address public burnVault;
+    uint256 public minXvixPrice;
     uint256 public unlockTime;
     address public gov;
 
@@ -37,6 +38,7 @@ contract GmtSwap is ReentrancyGuard {
         address _wethXvixUni,
         address _allocator,
         uint256 _unlockTime,
+        uint256 _minXvixPrice,
         address _burnVault
     ) public {
         xvix = _xvix;
@@ -50,8 +52,10 @@ contract GmtSwap is ReentrancyGuard {
         wethXvixUni = _wethXvixUni;
 
         allocator = _allocator;
-        burnVault = _burnVault;
         unlockTime = _unlockTime;
+        minXvixPrice = _minXvixPrice;
+        burnVault = _burnVault;
+
         gov = msg.sender;
     }
 
@@ -149,7 +153,11 @@ contract GmtSwap is ReentrancyGuard {
         uint256 ethPrice = getEthPrice();
         uint256 wethBalance = IERC20(weth).balanceOf(wethXvixUni);
         uint256 xvixBalance = IERC20(xvix).balanceOf(wethXvixUni);
-        return wethBalance.mul(ethPrice).div(xvixBalance);
+        uint256 price = wethBalance.mul(ethPrice).div(xvixBalance);
+        if (price < minXvixPrice) {
+            return minXvixPrice;
+        }
+        return price;
     }
 
     function getUniPrice() public view returns (uint256) {
