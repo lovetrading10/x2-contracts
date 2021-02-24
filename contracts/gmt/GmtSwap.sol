@@ -16,6 +16,7 @@ contract GmtSwap is ReentrancyGuard {
     uint256 constant PRECISION = 1000000;
 
     bool public isInitialized;
+    bool public isSwapActive = true;
 
     address public xvix;
     address public uni;
@@ -95,14 +96,15 @@ contract GmtSwap is ReentrancyGuard {
         bytes32 _r,
         bytes32 _s
     ) public nonReentrant {
-        require(_tokenAmount > 0, "GmtSwap: Invalid tokenAmount");
-        require(_allocation > 0, "GmtSwap: Invalid gmtAllocation");
+        require(isSwapActive, "GmtSwap: swap is no longer active");
+        require(_tokenAmount > 0, "GmtSwap: invalid tokenAmount");
+        require(_allocation > 0, "GmtSwap: invalid gmtAllocation");
 
         _verifyAllocation(msg.sender, _allocation, _v, _r, _s);
         (uint256 transferAmount, uint256 mintAmount) = getSwapAmounts(
             msg.sender, _token, _tokenAmount, _allocation);
-        require(transferAmount > 0, "GmtSwap: Invalid transferAmount");
-        require(mintAmount > 0, "GmtSwap: Invalid mintAmount");
+        require(transferAmount > 0, "GmtSwap: invalid transferAmount");
+        require(mintAmount > 0, "GmtSwap: invalid mintAmount");
 
         IXVIX(xvix).rebase();
         IERC20(_token).transferFrom(msg.sender, address(this), transferAmount);
@@ -113,6 +115,10 @@ contract GmtSwap is ReentrancyGuard {
         }
 
         IGmtIou(gmtIou).mint(msg.sender, mintAmount);
+    }
+
+    function endSwap() public onlyGov {
+        isSwapActive = false;
     }
 
     function getSwapAmounts(
@@ -132,7 +138,8 @@ contract GmtSwap is ReentrancyGuard {
 
         if (mintAmount > maxMintAmount) {
             mintAmount = maxMintAmount;
-            transferAmount = mintAmount.mul(gmtPrice).div(tokenPrice);
+            // round up the transferAmount
+            transferAmount = mintAmount.mul(gmtPrice).mul(10).div(tokenPrice).add(9).div(10);
         }
 
         return (transferAmount, mintAmount);
@@ -183,15 +190,18 @@ contract GmtSwap is ReentrancyGuard {
         bytes32 _s
     ) private view {
         bytes32 message = keccak256(abi.encodePacked(
-            "\x19Ethereum Signed Message:\n32",
-            "GmtSwap: GmtAllocation",
+            "GmtSwap:GmtAllocation",
             _account,
             _allocation
         ));
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32",
+            message
+        ));
 
         require(
-            allocator == ecrecover(message, _v, _r, _s),
-            "GmtSwap: Invalid signature"
+            allocator == ecrecover(messageHash, _v, _r, _s),
+            "GmtSwap: invalid signature"
         );
     }
 }

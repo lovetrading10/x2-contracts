@@ -5,7 +5,18 @@ const { expandDecimals, increaseTime, mineBlock, getBlockTime } = require("../sh
 
 use(solidity)
 
+async function signAllocation(account, allocation, signer) {
+    const message = ethers.utils.solidityKeccak256(
+      ["string", "address", "uint256"],
+      ["GmtSwap:GmtAllocation", account, allocation]
+    )
+    const bytes = ethers.utils.arrayify(message)
+    const signature = await signer.signMessage(bytes)
+    return ethers.utils.splitSignature(signature)
+}
+
 describe("GmtSwap", function () {
+  const { HashZero } = ethers.constants
   const provider = waffle.provider
   const [wallet, allocator, user0, user1, user2] = provider.getWallets()
   const precision = 1000000
@@ -210,5 +221,144 @@ describe("GmtSwap", function () {
     expect(await gmtSwap.getTokenPrice(xlge.address)).eq(xlgePrice)
     expect(await gmtSwap.getTokenPrice(xvix.address)).eq("62544039")
     expect(await gmtSwap.getTokenPrice(uni.address)).eq("781472057")
+  })
+
+  it("endSwap", async () => {
+    expect(await gmtSwap.isSwapActive()).eq(true)
+    await expect(gmtSwap.connect(user0).endSwap())
+      .to.be.revertedWith("GmtSwap: forbidden")
+
+    await gmtSwap.connect(wallet).endSwap()
+    expect(await gmtSwap.isSwapActive()).eq(false)
+
+    await expect(gmtSwap.connect(user0).swap(xvix.address, 100, 100, 1, HashZero, HashZero))
+      .to.be.revertedWith("GmtSwap: swap is no longer active")
+  })
+
+  it("swap xvix", async () => {
+    await xvix.transfer(user0.address, 1000)
+    await xvix.connect(user0).approve(gmtSwap.address, 1000)
+
+    await expect(gmtSwap.connect(user0).swap(
+      xvix.address,
+      0, // tokenAmount
+      2000, // allocation
+      1,
+      HashZero,
+      HashZero
+    )).to.be.revertedWith("GmtSwap: invalid tokenAmount")
+
+    await expect(gmtSwap.connect(user0).swap(
+      xvix.address,
+      100, // tokenAmount
+      0, // allocation
+      1,
+      HashZero,
+      HashZero
+    )).to.be.revertedWith("GmtSwap: invalid gmtAllocation")
+
+    const sig0 = await signAllocation(user0.address, 2000, user0)
+
+    await expect(gmtSwap.connect(user0).swap(
+      xvix.address,
+      100, // tokenAmount
+      2000, // allocation
+      sig0.v,
+      sig0.r,
+      sig0.s
+    )).to.be.revertedWith("GmtSwap: invalid signature")
+
+    const sig1 = await signAllocation(user0.address, 2000, allocator)
+    await expect(gmtSwap.connect(user0).swap(
+      xvix.address,
+      100, // tokenAmount
+      2001, // allocation
+      sig1.v,
+      sig1.r,
+      sig1.s
+    )).to.be.revertedWith("GmtSwap: invalid signature")
+
+    await expect(gmtSwap.connect(user1).swap(
+      xvix.address,
+      100, // tokenAmount
+      2000, // allocation
+      sig1.v,
+      sig1.r,
+      sig1.s
+    )).to.be.revertedWith("GmtSwap: invalid signature")
+
+    expect(await gmtIou.balanceOf(user0.address)).eq(0)
+    expect(await xvix.balanceOf(gmtSwap.address)).eq(0)
+    expect(await xvix.balanceOf(burnVault.address)).eq(0)
+    expect(await burnVault.balanceOf(gmtSwap.address)).eq(0)
+
+    await gmtSwap.connect(user0).swap(
+      xvix.address,
+      100, // tokenAmount
+      2000, // allocation
+      sig1.v,
+      sig1.r,
+      sig1.s
+    )
+
+    expect(await gmtIou.balanceOf(user0.address)).eq(1389) // 62.544039 * 100 / 4.5
+    expect(await xvix.balanceOf(gmtSwap.address)).eq(0)
+    expect(await xvix.balanceOf(burnVault.address)).eq(100)
+    expect(await burnVault.balanceOf(gmtSwap.address)).eq(100)
+  })
+
+  it("swap uni", async () => {
+    await uni.mint(user0.address, 1000)
+    await uni.connect(user0).approve(gmtSwap.address, 1000)
+
+    const sig = await signAllocation(user0.address, 2000, allocator)
+    expect(await gmtIou.balanceOf(user0.address)).eq(0)
+    expect(await uni.balanceOf(gmtSwap.address)).eq(0)
+
+    await gmtSwap.connect(user0).swap(
+      uni.address,
+      10, // tokenAmount
+      2000, // allocation
+      sig.v,
+      sig.r,
+      sig.s
+    )
+
+    expect(await gmtIou.balanceOf(user0.address)).eq(1736) // 781.472057 * 10 / 4.5
+    expect(await uni.balanceOf(gmtSwap.address)).eq(10)
+  })
+
+  it("swap xlge", async () => {
+    await xlge.mint(user0.address, 1000)
+    await xlge.connect(user0).approve(gmtSwap.address, 1000)
+
+    const sig = await signAllocation(user0.address, 23000, allocator)
+    expect(await gmtIou.balanceOf(user0.address)).eq(0)
+    expect(await xlge.balanceOf(gmtSwap.address)).eq(0)
+
+    await gmtSwap.connect(user0).swap(
+      xlge.address,
+      3, // tokenAmount
+      23000, // allocation
+      sig.v,
+      sig.r,
+      sig.s
+    )
+
+    expect(await gmtIou.balanceOf(user0.address)).eq(15000) // 22500 * 3 / 4.5
+    expect(await xlge.balanceOf(gmtSwap.address)).eq(3)
+
+    await gmtSwap.connect(user0).swap(
+      xlge.address,
+      3, // tokenAmount
+      23000, // allocation
+      sig.v,
+      sig.r,
+      sig.s
+    )
+
+    expect(await gmtIou.balanceOf(user0.address)).eq(23000)
+    expect(await xlge.balanceOf(gmtSwap.address)).eq(5)
+    expect(await xlge.balanceOf(user0.address)).eq(995)
   })
 })
