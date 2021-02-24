@@ -36,8 +36,8 @@ async function loadETHFixtures(provider) {
 
 async function loadXvixFixtures(provider) {
   const govHandoverTime = 1 // for testing convenience use a govHandoverTime that has already passed
-  const initialSupply = expandDecimals(1000, 18)
-  const maxSupply = expandDecimals(2000, 18)
+  const initialSupply = expandDecimals(100000, 18)
+  const maxSupply = expandDecimals(200000, 18)
   const xvix = await deployContract("XVIX", [initialSupply, maxSupply, govHandoverTime])
   const floor = await deployContract("Floor", [xvix.address])
   await xvix.setFloor(floor.address)

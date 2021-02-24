@@ -22,9 +22,9 @@ contract GmtIou is IERC20, IGmtIou {
 
     address public minter;
 
-    constructor (string memory _name, string memory _symbol, address _minter) public {
-        name = _name;
-        symbol = _symbol;
+    constructor (address _minter) public {
+        name = "GMT (IOU)";
+        symbol = "GMT:IOU";
         minter = _minter;
         decimals = 18;
     }

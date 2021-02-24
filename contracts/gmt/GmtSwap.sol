@@ -13,6 +13,8 @@ import "../interfaces/IGmtIou.sol";
 contract GmtSwap is ReentrancyGuard {
     using SafeMath for uint256;
 
+    uint256 constant PRECISION = 1000000;
+
     bool public isInitialized;
 
     address public xvix;
@@ -152,7 +154,7 @@ contract GmtSwap is ReentrancyGuard {
     function getEthPrice() public view returns (uint256) {
         uint256 wethBalance = IERC20(weth).balanceOf(wethDaiUni);
         uint256 daiBalance = IERC20(dai).balanceOf(wethDaiUni);
-        return daiBalance.mul(100).div(wethBalance);
+        return daiBalance.mul(PRECISION).div(wethBalance);
     }
 
     function getXvixPrice() public view returns (uint256) {

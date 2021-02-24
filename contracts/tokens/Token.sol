@@ -29,7 +29,7 @@ import "../libraries/math/SafeMath.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract WETH is IERC20 {
+contract Token is IERC20 {
     using SafeMath for uint256;
 
     mapping (address => uint256) private _balances;
@@ -52,8 +52,8 @@ contract WETH is IERC20 {
      * construction.
      */
     constructor () public {
-        _name = "Wrapped ETH";
-        _symbol = "WETH";
+        _name = "Token";
+        _symbol = "TOKEN";
         _decimals = 18;
     }
 
