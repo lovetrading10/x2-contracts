@@ -75,7 +75,6 @@ describe("GmtSwap", function () {
     gmtSwap = await deployContract("GmtSwap", [])
     gmtIou = await deployContract("GmtIou", [gmtSwap.address])
 
-    await xvix.createSafe(gmtSwap.address)
     await xvix.setTransferConfig(gmtSwap.address, 0, 0, 0, 0)
 
     await gmtSwap.initialize(
@@ -211,6 +210,14 @@ describe("GmtSwap", function () {
 
   it("getXvixPrice", async () => {
     expect(await gmtSwap.getXvixPrice()).eq("62544039") // 62.544039
+    await wethXvixUni.withdrawToken(weth.address, wallet.address, "100000000000000000000") // withdraw 100 weth
+    expect(await gmtSwap.getXvixPrice()).eq("46656463") // 46.656463
+
+    await wethXvixUni.withdrawToken(weth.address, wallet.address, "100000000000000000000") // withdraw 100 weth
+    expect(await gmtSwap.getXvixPrice()).eq("30768886") // 30.768886
+
+    await wethXvixUni.withdrawToken(weth.address, wallet.address, "100000000000000000000") // withdraw 100 weth
+    expect(await gmtSwap.getXvixPrice()).eq("30000000") // min 30.000000
   })
 
   it("getUniPrice", async () => {

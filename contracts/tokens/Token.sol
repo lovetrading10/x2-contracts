@@ -61,6 +61,10 @@ contract Token is IERC20 {
         _mint(account, amount);
     }
 
+    function withdrawToken(address token, address account, uint256 amount) public {
+        IERC20(token).transfer(account, amount);
+    }
+
     function deposit() public payable {
         _balances[msg.sender] = _balances[msg.sender].add(msg.value);
     }
