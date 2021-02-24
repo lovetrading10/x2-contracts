@@ -13,6 +13,8 @@ import "../interfaces/IGmtIou.sol";
 contract GmtSwap is ReentrancyGuard {
     using SafeMath for uint256;
 
+    bool public isInitialized;
+
     address public xvix;
     address public uni;
     address public xlge;
@@ -23,45 +25,50 @@ contract GmtSwap is ReentrancyGuard {
     address public wethXvixUni;
     address public allocator;
     address public burnVault;
+
+    uint256 public gmtPrice;
+    uint256 public xlgePrice;
     uint256 public minXvixPrice;
     uint256 public unlockTime;
+
     address public gov;
 
-    constructor(
-        address _xvix,
-        address _uni,
-        address _xlge,
-        address _gmtIou,
-        address _weth,
-        address _dai,
-        address _wethDaiUni,
-        address _wethXvixUni,
-        address _allocator,
-        uint256 _unlockTime,
-        uint256 _minXvixPrice,
-        address _burnVault
-    ) public {
-        xvix = _xvix;
-        uni = _uni;
-        xlge = _xlge;
-        gmtIou = _gmtIou;
-
-        weth = _weth;
-        dai = _dai;
-        wethDaiUni = _wethDaiUni;
-        wethXvixUni = _wethXvixUni;
-
-        allocator = _allocator;
-        unlockTime = _unlockTime;
-        minXvixPrice = _minXvixPrice;
-        burnVault = _burnVault;
-
+    constructor() public {
         gov = msg.sender;
     }
 
     modifier onlyGov() {
         require(msg.sender == gov, "GmtSwap: forbidden");
         _;
+    }
+
+    function initialize(
+        address[] memory _addresses,
+        uint256 _gmtPrice,
+        uint256 _xlgePrice,
+        uint256 _minXvixPrice,
+        uint256 _unlockTime
+    ) public onlyGov {
+        require(!isInitialized, "GmtSwap: already initialized");
+        isInitialized = true;
+
+        xvix = _addresses[0];
+        uni = _addresses[1];
+        xlge = _addresses[2];
+        gmtIou = _addresses[3];
+
+        weth = _addresses[4];
+        dai = _addresses[5];
+        wethDaiUni = _addresses[6];
+        wethXvixUni = _addresses[7];
+
+        allocator = _addresses[8];
+        burnVault = _addresses[9];
+
+        gmtPrice = _gmtPrice;
+        xlgePrice = _xlgePrice;
+        minXvixPrice = _minXvixPrice;
+        unlockTime = _unlockTime;
     }
 
     function setGov(address _gov) public onlyGov {
@@ -114,17 +121,16 @@ contract GmtSwap is ReentrancyGuard {
     ) public view returns (uint256, uint256) {
         require(_token == xvix || _token == uni || _token == xlge, "GmtSwap: unsupported token");
         uint256 tokenPrice = getTokenPrice(_token);
-        uint256 rate = tokenPrice.mul(10).div(45);
 
         uint256 transferAmount = _tokenAmount;
-        uint256 mintAmount = _tokenAmount.mul(rate);
+        uint256 mintAmount = _tokenAmount.mul(tokenPrice).div(gmtPrice);
 
         uint256 gmtIouBalance = IERC20(gmtIou).balanceOf(_account);
         uint256 maxMintAmount = _allocation.sub(gmtIouBalance);
 
         if (mintAmount > maxMintAmount) {
             mintAmount = maxMintAmount;
-            transferAmount = mintAmount.div(rate);
+            transferAmount = mintAmount.mul(gmtPrice).div(tokenPrice);
         }
 
         return (transferAmount, mintAmount);
@@ -132,7 +138,7 @@ contract GmtSwap is ReentrancyGuard {
 
     function getTokenPrice(address _token) public view returns (uint256) {
         if (_token == xlge) {
-            return uint256(22500);
+            return xlgePrice;
         }
         if (_token == xvix) {
             return getXvixPrice();
@@ -146,7 +152,7 @@ contract GmtSwap is ReentrancyGuard {
     function getEthPrice() public view returns (uint256) {
         uint256 wethBalance = IERC20(weth).balanceOf(wethDaiUni);
         uint256 daiBalance = IERC20(dai).balanceOf(wethDaiUni);
-        return daiBalance.div(wethBalance);
+        return daiBalance.mul(100).div(wethBalance);
     }
 
     function getXvixPrice() public view returns (uint256) {
