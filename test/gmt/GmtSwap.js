@@ -249,7 +249,7 @@ describe("GmtSwap", function () {
     await expect(gmtSwap.connect(user0).swap(
       xvix.address,
       0, // tokenAmount
-      2000, // allocation
+      3000, // allocation
       1,
       HashZero,
       HashZero
@@ -264,18 +264,18 @@ describe("GmtSwap", function () {
       HashZero
     )).to.be.revertedWith("GmtSwap: invalid gmtAllocation")
 
-    const sig0 = await signAllocation(user0.address, 2000, user0)
+    const sig0 = await signAllocation(user0.address, 3000, user0)
 
     await expect(gmtSwap.connect(user0).swap(
       xvix.address,
       100, // tokenAmount
-      2000, // allocation
+      3000, // allocation
       sig0.v,
       sig0.r,
       sig0.s
     )).to.be.revertedWith("GmtSwap: invalid signature")
 
-    const sig1 = await signAllocation(user0.address, 2000, allocator)
+    const sig1 = await signAllocation(user0.address, 3000, allocator)
     await expect(gmtSwap.connect(user0).swap(
       xvix.address,
       100, // tokenAmount
@@ -288,7 +288,7 @@ describe("GmtSwap", function () {
     await expect(gmtSwap.connect(user1).swap(
       xvix.address,
       100, // tokenAmount
-      2000, // allocation
+      3000, // allocation
       sig1.v,
       sig1.r,
       sig1.s
@@ -302,7 +302,7 @@ describe("GmtSwap", function () {
     await gmtSwap.connect(user0).swap(
       xvix.address,
       100, // tokenAmount
-      2000, // allocation
+      3000, // allocation
       sig1.v,
       sig1.r,
       sig1.s
@@ -312,6 +312,22 @@ describe("GmtSwap", function () {
     expect(await xvix.balanceOf(gmtSwap.address)).eq(0)
     expect(await xvix.balanceOf(burnVault.address)).eq(100)
     expect(await burnVault.balanceOf(gmtSwap.address)).eq(100)
+
+    await wethXvixUni.withdrawToken(weth.address, wallet.address, "300000000000000000000") // withdraw 300 weth
+
+    await gmtSwap.connect(user0).swap(
+      xvix.address,
+      100, // tokenAmount
+      3000, // allocation
+      sig1.v,
+      sig1.r,
+      sig1.s
+    )
+
+    expect(await gmtIou.balanceOf(user0.address)).eq(2055) // 1389 + 666, 30 * 100 / 4.5
+    expect(await xvix.balanceOf(gmtSwap.address)).eq(0)
+    expect(await xvix.balanceOf(burnVault.address)).eq(200)
+    expect(await burnVault.balanceOf(gmtSwap.address)).eq(200)
   })
 
   it("swap uni", async () => {
