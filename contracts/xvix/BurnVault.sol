@@ -25,7 +25,7 @@ contract BurnVault is ReentrancyGuard, IERC20, IBurnVault {
     address public distributor;
 
     uint256 public initialDivisor;
-    uint256 public _totalSupply;
+    uint256 public override _totalSupply;
 
     mapping (address => uint256) public balances;
     mapping (address => bool) public senders;

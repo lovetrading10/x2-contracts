@@ -4,4 +4,5 @@ pragma solidity 0.6.12;
 
 interface IBurnVault {
     function deposit(uint256 amount) external;
+    function _totalSupply() external view returns (uint256);
 }

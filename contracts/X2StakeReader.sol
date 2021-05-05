@@ -6,6 +6,7 @@ import "./libraries/math/SafeMath.sol";
 import "./libraries/token/IERC20.sol";
 import "./interfaces/IX2TimeDistributor.sol";
 import "./interfaces/IX2Farm.sol";
+import "./interfaces/IBurnVault.sol";
 
 contract X2StakeReader {
     using SafeMath for uint256;
@@ -87,7 +88,7 @@ contract X2StakeReader {
         amounts[0] = IX2TimeDistributor(_distributor).ethPerInterval(_farm);
 
         uint256 balance = IX2Farm(_farm).balances(_account);
-        uint256 supply = IERC20(_farm).totalSupply();
+        uint256 supply = IBurnVault(_farm)._totalSupply();
         uint256 pendingRewards = IX2TimeDistributor(_distributor).getDistributionAmount(_farm);
         uint256 cumulativeRewardPerToken = IX2Farm(_farm).cumulativeRewardPerToken();
         uint256 claimableReward = IX2Farm(_farm).claimableReward(_account);
