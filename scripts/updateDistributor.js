@@ -10,9 +10,10 @@ async function main() {
   const burnVaultV2 = await contractAt("BurnVault", "0x780e9996Ec934cba0E2FC830C9b9f3e19F99ec3B")
   const timeVaultV2 = await contractAt("TimeVault", "0x82147C5A7E850eA4E28155DF107F2590fD4ba327")
 
-  const totalRewards = "2.41"
+  const totalRewards = "6.83"
   const totalRewardsAmount = ethers.utils.parseUnits(totalRewards, tokenDecimals)
   const transferAmout = totalRewardsAmount.mul(9500).div(10000)
+  // TODO: send ETH to distributor
   console.log("transferAmout", ethers.utils.formatUnits(transferAmout, tokenDecimals))
 
   const hourlyRewards = totalRewardsAmount.div(168)
