@@ -1,6 +1,9 @@
 const { deployContract, contractAt, sendTxn } = require("./helpers")
+const { MAINNET_DEPLOY_KEY } = require("../env.json")
 
 async function main() {
+  const wallet = new ethers.Wallet(MAINNET_DEPLOY_KEY)
+  console.log("wallet", wallet.address)
   const tokenDecimals = 18
   const account = { address: "0x5F799f365Fa8A2B60ac0429C48B153cA5a6f0Cf8" }
   const distributor = await contractAt("X2TimeDistributor", "0x7F98d265Ba2609c1534D12cF6b0976505Ad7F653")
@@ -10,11 +13,15 @@ async function main() {
   const burnVaultV2 = await contractAt("BurnVault", "0x780e9996Ec934cba0E2FC830C9b9f3e19F99ec3B")
   const timeVaultV2 = await contractAt("TimeVault", "0x82147C5A7E850eA4E28155DF107F2590fD4ba327")
 
-  const totalRewards = "6.83"
+  const totalRewards = "3.45"
   const totalRewardsAmount = ethers.utils.parseUnits(totalRewards, tokenDecimals)
   const transferAmout = totalRewardsAmount.mul(9500).div(10000)
-  // TODO: send ETH to distributor
+
   console.log("transferAmout", ethers.utils.formatUnits(transferAmout, tokenDecimals))
+  await sendTxn(wallet.sendTransaction({
+    to: distributor.address,
+    value: transferAmout
+  }), "sent ETH")
 
   const hourlyRewards = totalRewardsAmount.div(168)
 
