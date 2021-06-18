@@ -7,6 +7,7 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 
 import "../interfaces/IGmxIou.sol";
+import "../interfaces/IAmmRouter.sol";
 
 contract GmxMigration is ReentrancyGuard {
     using SafeMath for uint256;
@@ -14,11 +15,13 @@ contract GmxMigration is ReentrancyGuard {
     uint256 constant PRECISION = 1000000;
 
     bool public isInitialized;
-    bool public isSwapActive = true;
+    bool public isMigrationActive = true;
 
+    address public ammRouter;
     address public xvix;
     address public uni;
     address public xlge;
+    address public weth;
     address public xvixGmxIou;
     address public uniGmxIou;
     address public xlgeGmxIou;
@@ -62,13 +65,15 @@ contract GmxMigration is ReentrancyGuard {
         require(!isInitialized, "GmxMigration: already initialized");
         isInitialized = true;
 
-        xvix = _addresses[0];
-        uni = _addresses[1];
-        xlge = _addresses[2];
+        ammRouter = _addresses[0];
+        xvix = _addresses[1];
+        uni = _addresses[2];
+        xlge = _addresses[3];
+        weth = _addresses[4];
 
-        xvixGmxIou = _addresses[3];
-        uniGmxIou = _addresses[3];
-        xlgeGmxIou = _addresses[3];
+        xvixGmxIou = _addresses[5];
+        uniGmxIou = _addresses[6];
+        xlgeGmxIou = _addresses[7];
 
         xvixPrice = _xvixPrice;
         uniPrice = _uniPrice;
@@ -81,14 +86,14 @@ contract GmxMigration is ReentrancyGuard {
     }
 
     function endSwap() public onlyAdmin {
-        isSwapActive = false;
+        isMigrationActive = false;
     }
 
-    function swap(
+    function migrate(
         address _token,
         uint256 _tokenAmount
     ) public nonReentrant {
-        require(isSwapActive, "GmxMigration: swap is no longer active");
+        require(isMigrationActive, "GmxMigration: migration is no longer active");
         require(_token == xvix || _token == uni || _token == xlge, "GmxMigration: unsupported token");
         require(_tokenAmount > 0, "GmxMigration: invalid tokenAmount");
 
@@ -97,6 +102,10 @@ contract GmxMigration is ReentrancyGuard {
         require(mintAmount > 0, "GmxMigration: invalid mintAmount");
 
         IERC20(_token).transferFrom(msg.sender, address(this), _tokenAmount);
+        if (_token == uni) {
+            IERC20(_token).approve(ammRouter, _tokenAmount);
+            IAmmRouter(ammRouter).removeLiquidity(weth, xvix, _tokenAmount, 0, 0, address(this), block.timestamp);
+        }
 
         address iouToken = getIouToken(_token);
         IGmxIou(iouToken).mint(msg.sender, mintAmount);
