@@ -9,7 +9,7 @@ import "../libraries/utils/ReentrancyGuard.sol";
 import "../interfaces/IGmxIou.sol";
 import "../interfaces/IAmmRouter.sol";
 
-contract GmxMigration is ReentrancyGuard {
+contract GmxMigrator is ReentrancyGuard {
     using SafeMath for uint256;
 
     uint256 constant PRECISION = 1000000;
@@ -46,12 +46,12 @@ contract GmxMigration is ReentrancyGuard {
     }
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "GmxMigration: forbidden");
+        require(msg.sender == admin, "GmxMigrator: forbidden");
         _;
     }
 
     modifier onlyApprover() {
-        require(msg.sender == approver, "GmxMigration: forbidden");
+        require(msg.sender == approver, "GmxMigrator: forbidden");
         _;
     }
 
@@ -62,7 +62,7 @@ contract GmxMigration is ReentrancyGuard {
         uint256 _xlgePrice,
         uint256 _gmxPrice
     ) public onlyAdmin {
-        require(!isInitialized, "GmxMigration: already initialized");
+        require(!isInitialized, "GmxMigrator: already initialized");
         isInitialized = true;
 
         ammRouter = _addresses[0];
@@ -85,7 +85,7 @@ contract GmxMigration is ReentrancyGuard {
         approver = _approver;
     }
 
-    function endSwap() public onlyAdmin {
+    function endMigration() public onlyAdmin {
         isMigrationActive = false;
     }
 
@@ -93,13 +93,13 @@ contract GmxMigration is ReentrancyGuard {
         address _token,
         uint256 _tokenAmount
     ) public nonReentrant {
-        require(isMigrationActive, "GmxMigration: migration is no longer active");
-        require(_token == xvix || _token == uni || _token == xlge, "GmxMigration: unsupported token");
-        require(_tokenAmount > 0, "GmxMigration: invalid tokenAmount");
+        require(isMigrationActive, "GmxMigrator: migration is no longer active");
+        require(_token == xvix || _token == uni || _token == xlge, "GmxMigrator: unsupported token");
+        require(_tokenAmount > 0, "GmxMigrator: invalid tokenAmount");
 
         uint256 tokenPrice = getTokenPrice(_token);
         uint256 mintAmount = _tokenAmount.mul(tokenPrice).div(gmxPrice);
-        require(mintAmount > 0, "GmxMigration: invalid mintAmount");
+        require(mintAmount > 0, "GmxMigrator: invalid mintAmount");
 
         IERC20(_token).transferFrom(msg.sender, address(this), _tokenAmount);
         if (_token == uni) {
@@ -121,7 +121,7 @@ contract GmxMigration is ReentrancyGuard {
         if (_token == xlge) {
             return xlgePrice;
         }
-        revert("GmxMigration: unsupported token");
+        revert("GmxMigrator: unsupported token");
     }
 
     function getIouToken(address _token) public view returns (address) {
@@ -134,7 +134,7 @@ contract GmxMigration is ReentrancyGuard {
         if (_token == xlge) {
             return xlgeGmxIou;
         }
-        revert("GmxMigration: unsupported token");
+        revert("GmxMigrator: unsupported token");
     }
 
     function signalApprove(address _token, address _spender, uint256 _amount) external onlyAdmin {
@@ -156,11 +156,11 @@ contract GmxMigration is ReentrancyGuard {
     }
 
     function _validateAction(bytes32 _action) private view {
-        require(pendingActions[_action], "GmxMigration: action not signalled");
+        require(pendingActions[_action], "GmxMigrator: action not signalled");
     }
 
     function _clearAction(bytes32 _action) private {
-        require(pendingActions[_action], "GmxMigration: invalid _action");
+        require(pendingActions[_action], "GmxMigrator: invalid _action");
         delete pendingActions[_action];
         emit ClearAction(_action);
     }
