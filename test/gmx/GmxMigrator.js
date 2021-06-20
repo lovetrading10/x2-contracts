@@ -8,7 +8,7 @@ use(solidity)
 describe("GmxMigrator", function () {
   const { HashZero } = ethers.constants
   const provider = waffle.provider
-  const [wallet, user0, user1, user2] = provider.getWallets()
+  const [wallet, user0, user1, user2, signer0, signer1, signer2] = provider.getWallets()
   const precision = 1000000
 
   let ammRouter = user2
@@ -35,7 +35,7 @@ describe("GmxMigrator", function () {
     xlge = await deployContract("Token", [])
     weth = await deployContract("WETH", [])
 
-    gmxMigrator = await deployContract("GmxMigrator", [])
+    gmxMigrator = await deployContract("GmxMigrator", [2, [signer0.address, signer1.address, signer2.address]])
 
     xvixGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "XVIX GMX (IOU)", "XVIX:GMX:IOU"])
     uniGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "UNI GMX (IOU)", "UNI:GMX:IOU"])
@@ -62,7 +62,14 @@ describe("GmxMigrator", function () {
 
   it("inits", async () => {
     expect(await gmxMigrator.admin()).eq(wallet.address)
-    expect(await gmxMigrator.approver()).eq(wallet.address)
+    expect(await gmxMigrator.signers(0)).eq(signer0.address)
+    expect(await gmxMigrator.signers(1)).eq(signer1.address)
+    expect(await gmxMigrator.signers(2)).eq(signer2.address)
+    expect(await gmxMigrator.isSigner(signer0.address)).eq(true)
+    expect(await gmxMigrator.isSigner(signer1.address)).eq(true)
+    expect(await gmxMigrator.isSigner(signer2.address)).eq(true)
+    expect(await gmxMigrator.isSigner(wallet.address)).eq(false)
+
     expect(await gmxMigrator.isInitialized()).eq(true)
 
     expect(await gmxMigrator.ammRouter()).eq(ammRouter.address)
@@ -112,25 +119,7 @@ describe("GmxMigrator", function () {
     )).to.be.revertedWith("GmxMigrator: already initialized")
   })
 
-  it("setApprover", async () => {
-    await expect(gmxMigrator.connect(user0).setApprover(user1.address))
-      .to.be.revertedWith("GmxMigrator: forbidden")
-
-    expect(await gmxMigrator.approver()).eq(wallet.address)
-    await gmxMigrator.connect(wallet).setApprover(user1.address)
-
-    expect(await gmxMigrator.approver()).eq(user1.address)
-
-    await expect(gmxMigrator.connect(wallet).setApprover(user2.address))
-      .to.be.revertedWith("GmxMigrator: forbidden")
-
-    await gmxMigrator.connect(user1).setApprover(user2.address)
-
-    expect(await gmxMigrator.approver()).eq(user2.address)
-  })
-
   it("endMigration", async () => {
-    await gmxMigrator.connect(wallet).setApprover(user0.address)
     await expect(gmxMigrator.connect(user0).endMigration())
       .to.be.revertedWith("GmxMigrator: forbidden")
 
@@ -164,25 +153,33 @@ describe("GmxMigrator", function () {
   })
 
   it("signalApprove", async () => {
-    await gmxMigrator.connect(wallet).setApprover(user0.address)
-    await xlge.mint(user1.address, expandDecimals(5, 18))
-    expect(await xlge.balanceOf(user1.address)).eq(expandDecimals(5, 18))
-    expect(await xlge.balanceOf(gmxMigrator.address)).eq(0)
-    expect(await xlgeGmxIou.balanceOf(user1.address)).eq(0)
-    await xlge.connect(user1).approve(gmxMigrator.address, expandDecimals(5, 18))
-    await gmxMigrator.connect(user1).migrate(xlge.address, expandDecimals(5, 18))
-    expect(await xlge.balanceOf(user1.address)).eq(0)
-    expect(await xlge.balanceOf(gmxMigrator.address)).eq(expandDecimals(5, 18))
-    expect(await xlgeGmxIou.balanceOf(user1.address)).eq("56250000000000000000000") // 22500 * 5 / 2 => 56250
-
     await expect(gmxMigrator.connect(user0).signalApprove(xlge.address, user2.address, expandDecimals(5, 18)))
       .to.be.revertedWith("GmxMigrator: forbidden")
 
     await gmxMigrator.connect(wallet).signalApprove(xlge.address, user2.address, expandDecimals(5, 18))
   })
 
+  it("signApprove", async () => {
+    await expect(gmxMigrator.connect(user0).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1))
+      .to.be.revertedWith("GmxMigrator: forbidden")
+
+    await expect(gmxMigrator.connect(signer2).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1))
+      .to.be.revertedWith("GmxMigrator: action not signalled")
+
+    await gmxMigrator.connect(wallet).signalApprove(xlge.address, user2.address, expandDecimals(5, 18))
+
+    await expect(gmxMigrator.connect(user0).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1))
+      .to.be.revertedWith("GmxMigrator: forbidden")
+
+    await gmxMigrator.connect(signer2).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1)
+
+    await expect(gmxMigrator.connect(signer2).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1))
+      .to.be.revertedWith("GmxMigrator: already signed")
+
+    await gmxMigrator.connect(signer1).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1)
+  })
+
   it("approve", async () => {
-    await gmxMigrator.connect(wallet).setApprover(user0.address)
     await xlge.mint(user1.address, expandDecimals(5, 18))
     expect(await xlge.balanceOf(user1.address)).eq(expandDecimals(5, 18))
     expect(await xlge.balanceOf(gmxMigrator.address)).eq(0)
@@ -193,27 +190,37 @@ describe("GmxMigrator", function () {
     expect(await xlge.balanceOf(gmxMigrator.address)).eq(expandDecimals(5, 18))
     expect(await xlgeGmxIou.balanceOf(user1.address)).eq("56250000000000000000000") // 22500 * 5 / 2 => 56250
 
-    await expect(gmxMigrator.connect(wallet).approve(xlge.address, user2.address, expandDecimals(5, 18)))
+    await expect(gmxMigrator.connect(user0).approve(xlge.address, user2.address, expandDecimals(5, 18), 1))
       .to.be.revertedWith("GmxMigrator: forbidden")
 
-    await expect(gmxMigrator.connect(user0).approve(xlge.address, user2.address, expandDecimals(5, 18)))
+    await expect(gmxMigrator.connect(wallet).approve(xlge.address, user2.address, expandDecimals(5, 18), 1))
       .to.be.revertedWith("GmxMigrator: action not signalled")
 
     await gmxMigrator.connect(wallet).signalApprove(xlge.address, user2.address, expandDecimals(5, 18))
 
-    await expect(gmxMigrator.connect(user0).approve(xvix.address, user2.address, expandDecimals(5, 18)))
+    await expect(gmxMigrator.connect(wallet).approve(xvix.address, user2.address, expandDecimals(5, 18), 1))
       .to.be.revertedWith("GmxMigrator: action not signalled")
 
-    await expect(gmxMigrator.connect(user0).approve(xlge.address, user0.address, expandDecimals(5, 18)))
+    await expect(gmxMigrator.connect(wallet).approve(xlge.address, user0.address, expandDecimals(5, 18), 1))
       .to.be.revertedWith("GmxMigrator: action not signalled")
 
-    await expect(gmxMigrator.connect(user0).approve(xlge.address, user2.address, expandDecimals(6, 18)))
+    await expect(gmxMigrator.connect(wallet).approve(xlge.address, user2.address, expandDecimals(6, 18), 1))
       .to.be.revertedWith("GmxMigrator: action not signalled")
+
+    await expect(gmxMigrator.connect(wallet).approve(xlge.address, user2.address, expandDecimals(5, 18), 1))
+      .to.be.revertedWith("GmxMigrator: action not authorized")
+
+    await gmxMigrator.connect(signer0).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1)
+
+    await expect(gmxMigrator.connect(wallet).approve(xlge.address, user2.address, expandDecimals(5, 18), 1))
+      .to.be.revertedWith("GmxMigrator: insufficient authorization")
+
+    await gmxMigrator.connect(signer2).signApprove(xlge.address, user2.address, expandDecimals(5, 18), 1)
 
     await expect(xlge.connect(user2).transferFrom(gmxMigrator.address, user1.address, expandDecimals(4, 18)))
       .to.be.revertedWith("ERC20: transfer amount exceeds allowance")
 
-    await gmxMigrator.connect(user0).approve(xlge.address, user2.address, expandDecimals(5, 18))
+    gmxMigrator.connect(wallet).approve(xlge.address, user2.address, expandDecimals(5, 18), 1)
 
     await expect(xlge.connect(user2).transferFrom(gmxMigrator.address, user1.address, expandDecimals(6, 18)))
       .to.be.revertedWith("ERC20: transfer amount exceeds balance")
