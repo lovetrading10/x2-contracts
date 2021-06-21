@@ -1,9 +1,11 @@
 const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
 const { loadXvixFixtures, deployContract } = require("../shared/fixtures")
-const { expandDecimals, increaseTime, mineBlock, getBlockTime } = require("../shared/utilities")
+const { bigNumberify, expandDecimals, increaseTime, mineBlock, getBlockTime } = require("../shared/utilities")
 
 use(solidity)
+
+const { MaxUint256 } = ethers.constants
 
 describe("GmxMigrator", function () {
   const { HashZero } = ethers.constants
@@ -12,6 +14,13 @@ describe("GmxMigrator", function () {
   const precision = 1000000
 
   let ammRouter = user2
+  let whitelistedTokens
+  let iouTokens
+  let prices
+  let lpTokens
+  let lpTokenAs
+  let lpTokenBs
+
   let xvix
   let uni
   let xlge
@@ -20,10 +29,10 @@ describe("GmxMigrator", function () {
   let uniGmxIou
   let xlgeGmxIou
 
-  const gmxPrice = 2 * precision
-  const xvixPrice = 29.17 * precision
-  const uniPrice = parseInt(682.27 * precision * 1.1)
-  const xlgePrice = 22500 * precision
+  const gmxPrice = bigNumberify(2 * precision)
+  const xvixPrice = bigNumberify(29.17 * precision)
+  const uniPrice = bigNumberify(parseInt(682.27 * precision * 1.1))
+  const xlgePrice = bigNumberify(22500 * precision)
 
   let gmxMigrator
 
@@ -41,22 +50,25 @@ describe("GmxMigrator", function () {
     uniGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "UNI GMX (IOU)", "UNI:GMX:IOU"])
     xlgeGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "XLGE GMX (IOU)", "XLGE:GMX:IOU"])
 
-    await gmxMigrator.initialize(
-      [
-        ammRouter.address,
-        xvix.address,
-        uni.address,
-        xlge.address,
-        weth.address,
+    whitelistedTokens = [xvix.address, uni.address, xlge.address]
+    iouTokens = [xvixGmxIou.address, uniGmxIou.address, xlgeGmxIou.address]
+    prices = [xvixPrice, uniPrice, xlgePrice]
+    caps = [MaxUint256, expandDecimals(3, 18), MaxUint256]
 
-        xvixGmxIou.address,
-        uniGmxIou.address,
-        xlgeGmxIou.address
-      ],
-      xvixPrice,
-      uniPrice,
-      xlgePrice,
-      gmxPrice
+    lpTokens = [uni.address]
+    lpTokenAs = [xvix.address]
+    lpTokenBs = [weth.address]
+
+    await gmxMigrator.initialize(
+      ammRouter.address,
+      gmxPrice,
+      whitelistedTokens,
+      iouTokens,
+      prices,
+      caps,
+      lpTokens,
+      lpTokenAs,
+      lpTokenBs
     )
   })
 
@@ -73,50 +85,42 @@ describe("GmxMigrator", function () {
     expect(await gmxMigrator.isInitialized()).eq(true)
 
     expect(await gmxMigrator.ammRouter()).eq(ammRouter.address)
-    expect(await gmxMigrator.xvix()).eq(xvix.address)
-    expect(await gmxMigrator.uni()).eq(uni.address)
-    expect(await gmxMigrator.xlge()).eq(xlge.address)
-    expect(await gmxMigrator.weth()).eq(weth.address)
+    expect(await gmxMigrator.gmxPrice()).eq(gmxPrice)
+    expect(await gmxMigrator.whitelistedTokens(xvix.address)).eq(true)
+    expect(await gmxMigrator.whitelistedTokens(uni.address)).eq(true)
+    expect(await gmxMigrator.whitelistedTokens(xlge.address)).eq(true)
+    expect(await gmxMigrator.whitelistedTokens(weth.address)).eq(false)
 
-    expect(await gmxMigrator.xvixGmxIou()).eq(xvixGmxIou.address)
-    expect(await gmxMigrator.uniGmxIou()).eq(uniGmxIou.address)
-    expect(await gmxMigrator.xlgeGmxIou()).eq(xlgeGmxIou.address)
+    expect(await gmxMigrator.iouTokens(xvix.address)).eq(xvixGmxIou.address)
+    expect(await gmxMigrator.iouTokens(uni.address)).eq(uniGmxIou.address)
+    expect(await gmxMigrator.iouTokens(xlge.address)).eq(xlgeGmxIou.address)
+
+    expect(await gmxMigrator.prices(xvix.address)).eq(xvixPrice)
+    expect(await gmxMigrator.prices(uni.address)).eq(uniPrice)
+    expect(await gmxMigrator.prices(xlge.address)).eq(xlgePrice)
+
+    expect(await gmxMigrator.caps(xvix.address)).eq(MaxUint256)
+    expect(await gmxMigrator.caps(uni.address)).eq(expandDecimals(3, 18))
+    expect(await gmxMigrator.caps(xlge.address)).eq(MaxUint256)
+
+    expect(await gmxMigrator.lpTokens(xvix.address)).eq(false)
+    expect(await gmxMigrator.lpTokens(uni.address)).eq(true)
+    expect(await gmxMigrator.lpTokens(xlge.address)).eq(false)
+
+    expect(await gmxMigrator.lpTokenAs(uni.address)).eq(xvix.address)
+    expect(await gmxMigrator.lpTokenBs(uni.address)).eq(weth.address)
 
     await expect(gmxMigrator.connect(user0).initialize(
-      [
-        ammRouter.address,
-        xvix.address,
-        uni.address,
-        xlge.address,
-        weth.address,
-
-        xvixGmxIou.address,
-        uniGmxIou.address,
-        xlgeGmxIou.address
-      ],
-      xvixPrice,
-      uniPrice,
-      xlgePrice,
-      gmxPrice
+      ammRouter.address,
+      gmxPrice,
+      whitelistedTokens,
+      iouTokens,
+      prices,
+      caps,
+      lpTokens,
+      lpTokenAs,
+      lpTokenBs
     )).to.be.revertedWith("GmxMigrator: forbidden")
-
-    await expect(gmxMigrator.initialize(
-      [
-        ammRouter.address,
-        xvix.address,
-        uni.address,
-        xlge.address,
-        weth.address,
-
-        xvixGmxIou.address,
-        uniGmxIou.address,
-        xlgeGmxIou.address
-      ],
-      xvixPrice,
-      uniPrice,
-      xlgePrice,
-      gmxPrice
-    )).to.be.revertedWith("GmxMigrator: already initialized")
   })
 
   it("endMigration", async () => {
@@ -133,11 +137,20 @@ describe("GmxMigrator", function () {
     expect(await xvix.balanceOf(user1.address)).eq("19900000000000000000")
     expect(await xvix.balanceOf(gmxMigrator.address)).eq(0)
     expect(await xvixGmxIou.balanceOf(user1.address)).eq(0)
+    expect(await gmxMigrator.tokenAmounts(xvix.address)).eq(0)
     await xvix.connect(user1).approve(gmxMigrator.address, expandDecimals(20, 18))
     await gmxMigrator.connect(user1).migrate(xvix.address, "19900000000000000000")
     expect(await xvix.balanceOf(user1.address)).eq(0)
     expect(await xvix.balanceOf(gmxMigrator.address)).eq("19800500000000000000")
     expect(await xvixGmxIou.balanceOf(user1.address)).eq("290241500000000000000") // 19.9 * 29.17 / 2 => 290.2415
+    expect(await gmxMigrator.tokenAmounts(xvix.address)).eq("19900000000000000000")
+  })
+
+  it("migrate uni", async () => {
+    await uni.mint(user1.address, expandDecimals(4, 18))
+    await uni.connect(user1).approve(gmxMigrator.address, expandDecimals(4, 18))
+    await expect(gmxMigrator.connect(user1).migrate(uni.address, expandDecimals(4, 18)))
+      .to.be.revertedWith("GmxMigrator: token cap exceeded")
   })
 
   it("migrate xlge", async () => {
@@ -145,11 +158,13 @@ describe("GmxMigrator", function () {
     expect(await xlge.balanceOf(user1.address)).eq(expandDecimals(5, 18))
     expect(await xlge.balanceOf(gmxMigrator.address)).eq(0)
     expect(await xlgeGmxIou.balanceOf(user1.address)).eq(0)
+    expect(await gmxMigrator.tokenAmounts(xlge.address)).eq(0)
     await xlge.connect(user1).approve(gmxMigrator.address, expandDecimals(5, 18))
     await gmxMigrator.connect(user1).migrate(xlge.address, expandDecimals(5, 18))
     expect(await xlge.balanceOf(user1.address)).eq(0)
     expect(await xlge.balanceOf(gmxMigrator.address)).eq(expandDecimals(5, 18))
     expect(await xlgeGmxIou.balanceOf(user1.address)).eq("56250000000000000000000") // 22500 * 5 / 2 => 56250
+    expect(await gmxMigrator.tokenAmounts(xlge.address)).eq(expandDecimals(5, 18))
   })
 
   it("signalApprove", async () => {
