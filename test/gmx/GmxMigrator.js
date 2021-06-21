@@ -44,11 +44,11 @@ describe("GmxMigrator", function () {
     xlge = await deployContract("Token", [])
     weth = await deployContract("WETH", [])
 
-    gmxMigrator = await deployContract("GmxMigrator", [2, [signer0.address, signer1.address, signer2.address]])
+    gmxMigrator = await deployContract("GmxMigrator", [2])
 
-    xvixGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "XVIX GMX (IOU)", "XVIX:GMX:IOU"])
-    uniGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "UNI GMX (IOU)", "UNI:GMX:IOU"])
-    xlgeGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "XLGE GMX (IOU)", "XLGE:GMX:IOU"])
+    xvixGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "XVIX GMX (IOU)", "XVIX:GMX"])
+    uniGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "UNI GMX (IOU)", "UNI:GMX"])
+    xlgeGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "XLGE GMX (IOU)", "XLGE:GMX"])
 
     whitelistedTokens = [xvix.address, uni.address, xlge.address]
     iouTokens = [xvixGmxIou.address, uniGmxIou.address, xlgeGmxIou.address]
@@ -62,6 +62,7 @@ describe("GmxMigrator", function () {
     await gmxMigrator.initialize(
       ammRouter.address,
       gmxPrice,
+      [signer0.address, signer1.address, signer2.address],
       whitelistedTokens,
       iouTokens,
       prices,
@@ -113,6 +114,7 @@ describe("GmxMigrator", function () {
     await expect(gmxMigrator.connect(user0).initialize(
       ammRouter.address,
       gmxPrice,
+      [signer0.address, signer1.address, signer2.address],
       whitelistedTokens,
       iouTokens,
       prices,
