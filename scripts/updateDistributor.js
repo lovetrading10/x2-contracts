@@ -13,22 +13,10 @@ async function main() {
   const uniFarm = await contractAt("Farm", "0x8A3d7A49ADa4FED00d83fA6827F46F83b62eF87F")
   const floor = { address: "0x40ED3699C2fFe43939ecf2F3d11F633b522820aD" }
 
-  const totalRewards = "2.2"
+  const totalRewards = "0"
   const totalRewardsAmount = ethers.utils.parseUnits(totalRewards, tokenDecimals)
   const transferAmoutForDistributor = totalRewardsAmount.mul(8000).div(10000)
   const transferAmoutForFloor = totalRewardsAmount.mul(2000).div(10000)
-
-  console.log("transferAmoutForDistributor", ethers.utils.formatUnits(transferAmoutForDistributor, tokenDecimals))
-  await sendTxn(wallet.sendTransaction({
-    to: distributor.address,
-    value: transferAmoutForDistributor
-  }), "transfer ETH")
-
-  console.log("transferAmoutForFloor", ethers.utils.formatUnits(transferAmoutForFloor, tokenDecimals))
-  await sendTxn(wallet.sendTransaction({
-    to: floor.address,
-    value: transferAmoutForFloor
-  }), "transfer ETH")
 
   const hourlyRewards = totalRewardsAmount.div(168)
 
@@ -44,8 +32,8 @@ async function main() {
     xlgeFarm.address,
     uniFarm.address
   ], [
-    xlgeRewards,
-    uniFarmRewards
+    "0",
+    "0"
   ]), "distributor.setDistribution")
 
   return { distributor }
