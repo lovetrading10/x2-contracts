@@ -147,7 +147,7 @@ contract XVIX is IERC20, IXVIX {
         fund = _fund;
     }
 
-    function createSafe(address _account) public onlyGov enforceMaxSupply {
+    function createSafe(address _account) public override onlyGov enforceMaxSupply {
         require(!safes[_account], "XVIX: account is already a safe");
         safes[_account] = true;
 

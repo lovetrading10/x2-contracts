@@ -3,6 +3,7 @@
 pragma solidity 0.6.12;
 
 import "../interfaces/ITimelockTarget.sol";
+import "../interfaces/IXVIX.sol";
 
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
@@ -27,6 +28,10 @@ contract Timelock {
     constructor(uint256 _buffer) public {
         buffer = _buffer;
         admin = msg.sender;
+    }
+
+    function createSafe(address _token, address _account) external onlyAdmin {
+        IXVIX(_token).createSafe(_account);
     }
 
     function signalSetGov(address _target, address _gov) external onlyAdmin {
