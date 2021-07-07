@@ -14,6 +14,7 @@ contract GmxMigrator is ReentrancyGuard {
 
     bool public isInitialized;
     bool public isMigrationActive = true;
+    bool public hasMaxMigrationLimit = false;
 
     uint256 public minAuthorizations;
 
@@ -38,6 +39,9 @@ contract GmxMigrator is ReentrancyGuard {
     mapping (address => address) public lpTokenBs;
 
     mapping (address => uint256) public tokenAmounts;
+
+    mapping (address => mapping (address => uint256)) public migratedAmounts;
+    mapping (address => mapping (address => uint256)) public maxMigrationAmounts;
 
     event SignalApprove(address token, address spender, uint256 amount, bytes32 action, uint256 nonce);
 
@@ -110,6 +114,14 @@ contract GmxMigrator is ReentrancyGuard {
         isMigrationActive = false;
     }
 
+    function setHasMaxMigrationLimit(bool _hasMaxMigrationLimit) public onlyAdmin {
+        hasMaxMigrationLimit = _hasMaxMigrationLimit;
+    }
+
+    function setMaxMigrationAmount(address _account, address _token, uint256 _maxMigrationAmount) public onlyAdmin {
+        maxMigrationAmounts[_account][_token] = _maxMigrationAmount;
+    }
+
     function migrate(
         address _token,
         uint256 _tokenAmount
@@ -117,6 +129,11 @@ contract GmxMigrator is ReentrancyGuard {
         require(isMigrationActive, "GmxMigrator: migration is no longer active");
         require(whitelistedTokens[_token], "GmxMigrator: token not whitelisted");
         require(_tokenAmount > 0, "GmxMigrator: invalid tokenAmount");
+
+        if (hasMaxMigrationLimit) {
+            migratedAmounts[msg.sender][_token] = migratedAmounts[msg.sender][_token].add(_tokenAmount);
+            require(migratedAmounts[msg.sender][_token] <= maxMigrationAmounts[msg.sender][_token], "GmxMigrator: maxMigrationAmount exceeded");
+        }
 
         uint256 tokenPrice = getTokenPrice(_token);
         uint256 mintAmount = _tokenAmount.mul(tokenPrice).div(gmxPrice);

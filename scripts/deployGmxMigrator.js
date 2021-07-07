@@ -31,7 +31,7 @@ async function main() {
   const whitelistedTokens = [xvix.address, uni.address, xlge.address]
   const iouTokens = [xvixGmxIou.address, uniGmxIou.address, xlgeGmxIou.address]
   const prices = [xvixPrice, uniPrice, xlgePrice]
-  const caps = [MaxUint256, expandDecimals(785, 18), MaxUint256]
+  const caps = [MaxUint256, 0, MaxUint256]
   const lpTokens = [uni.address]
   const lpTokenAs = [xvix.address]
   const lpTokenBs = [weth.address]
