@@ -1,9 +1,9 @@
 const { contractAt, sendTxn } = require("./helpers")
 
 async function main() {
-  const account = "0x364ed130c39baa6f9f64c2961d93c52321bc4f4d"
-  const shouldApprove = false
-  const gasPriceGwei = "32"
+  const account = "0x2FCE3CB128DC9def6a34e230C609ad3Dc4A7Dd87"
+  const shouldApprove = true
+  const gasPriceGwei = "15"
   const gasPriceWei = ethers.utils.parseUnits(gasPriceGwei, 9)
   const migrationTokens = ["XVIX"]
   // const migrationTokens = ["XVIX", "XVIX_ETH", "XLGE"]
