@@ -13,9 +13,7 @@ import "../interfaces/IXlgeDistributor.sol";
 contract XvixBurner is ReentrancyGuard {
     using SafeMath for uint256;
 
-    address public migrator;
     address public weth;
-
     address public admin;
 
     modifier onlyAdmin() {
@@ -23,8 +21,7 @@ contract XvixBurner is ReentrancyGuard {
         _;
     }
 
-    constructor(address _migrator, address _weth) public {
-        migrator = _migrator;
+    constructor(address _weth) public {
         weth = _weth;
         admin = msg.sender;
     }
@@ -41,12 +38,13 @@ contract XvixBurner is ReentrancyGuard {
     }
 
     function burnXvix(
+        address _migrator,
         address _xvix,
         address _floor,
         uint256 _transferAmount,
         uint256 _repetitions
     ) external nonReentrant onlyAdmin {
-        IERC20(_xvix).transferFrom(migrator, address(this), _transferAmount);
+        IERC20(_xvix).transferFrom(_migrator, address(this), _transferAmount);
         uint256 balance = IERC20(_xvix).balanceOf(address(this));
         uint256 batchAmount = balance.div(_repetitions);
 
@@ -57,15 +55,16 @@ contract XvixBurner is ReentrancyGuard {
         uint256 amountETH = address(this).balance;
         IWETH(weth).deposit{value: amountETH}();
 
-        IERC20(weth).transfer(migrator, amountETH);
+        IERC20(weth).transfer(_migrator, amountETH);
     }
 
     function burnXlge(
+        address _migrator,
         address _xlge,
         address _distributor,
         uint256 _amount
     ) external nonReentrant onlyAdmin {
-        IERC20(_xlge).transferFrom(migrator, address(this), _amount);
+        IERC20(_xlge).transferFrom(_migrator, address(this), _amount);
         IXlgeDistributor(_distributor).removeLiquidityETH(
             _amount,
             0,
@@ -77,6 +76,6 @@ contract XvixBurner is ReentrancyGuard {
         uint256 amountETH = address(this).balance;
         IWETH(weth).deposit{value: amountETH}();
 
-        IERC20(weth).transfer(migrator, amountETH);
+        IERC20(weth).transfer(_migrator, amountETH);
     }
 }

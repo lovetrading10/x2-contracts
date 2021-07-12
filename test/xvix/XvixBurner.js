@@ -22,11 +22,10 @@ describe("XvixBurner", function () {
 
     weth = await deployContract("WETH", [])
 
-    burner = await deployContract("XvixBurner", [migrator.address, weth.address])
+    burner = await deployContract("XvixBurner", [weth.address])
   })
 
   it("inits", async () => {
-    expect(await burner.migrator()).eq(migrator.address)
     expect(await burner.weth()).eq(weth.address)
     expect(await burner.admin()).eq(wallet.address)
   })
@@ -35,7 +34,7 @@ describe("XvixBurner", function () {
     await xvix.transfer(user0.address, expandDecimals(60000, 18))
     await xvix.connect(user0).approve(burner.address, expandDecimals(60000, 18))
 
-    await expect(burner.burnXvix(xvix.address, floor.address, expandDecimals(50000, 18), 5))
+    await expect(burner.burnXvix(migrator.address, xvix.address, floor.address, expandDecimals(50000, 18), 5))
       .to.be.revertedWith("Floor: refund amount is zero")
 
     await wallet.sendTransaction({ to: floor.address, value: expandDecimals(1000, 18) })
@@ -43,7 +42,7 @@ describe("XvixBurner", function () {
     expect(await weth.balanceOf(user0.address)).eq(0)
     expect(await xvix.balanceOf(user0.address)).eq("59700000000000000000000")
     expect(await xvix.balanceOf(burner.address)).eq(0)
-    await burner.burnXvix(xvix.address, floor.address, expandDecimals(50000, 18), 5)
+    await burner.burnXvix(migrator.address, xvix.address, floor.address, expandDecimals(50000, 18), 5)
     expect(await weth.balanceOf(user0.address)).eq("461473200427111276527")
     expect(await xvix.balanceOf(user0.address)).eq("9700000000000000000000")
     expect(await xvix.balanceOf(burner.address)).eq(0)
