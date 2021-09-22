@@ -1,9 +1,9 @@
 const { contractAt, sendTxn } = require("./helpers")
 
 async function main() {
-  const account = "0x4C25c7E7BD06db70Ed83457bE350d6681E9cc151"
+  const account = "0x30043aAbBCeBbD887437Ec4F0Cfe6d4c0eB5CC64"
   const shouldApprove = true
-  const gasPriceGwei = "20"
+  const gasPriceGwei = "60"
   const gasPriceWei = ethers.utils.parseUnits(gasPriceGwei, 9)
   const migrationTokens = ["XVIX"]
   // const migrationTokens = ["XVIX", "XVIX_ETH", "XLGE"]
@@ -42,8 +42,11 @@ async function main() {
       const balance = await token.contract.balanceOf(account)
       if (balance.eq(0)) { continue }
 
-      const message = `approve ${account} ${token.name}: ${ethers.utils.formatUnits(balance, 18)}`
-      await sendTxn(gmxMigrator.setMaxMigrationAmount(account, token.contract.address, balance, { gasPrice: gasPriceWei }), message)
+      const migratedAmount = await gmxMigrator.migratedAmounts(account, token.contract.address)
+      const totalAmount = balance.add(migratedAmount)
+
+      const message = `approve ${account} ${token.name}: ${ethers.utils.formatUnits(balance, 18)}, ${ethers.utils.formatUnits(totalAmount, 18)}`
+      await sendTxn(gmxMigrator.setMaxMigrationAmount(account, token.contract.address, totalAmount, { gasPrice: gasPriceWei }), message)
     }
   }
 }
